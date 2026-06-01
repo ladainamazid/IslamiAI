@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>IslamiAI — Konsultasi Hukum Islam</title>
+
+  <!--
+    SECURITY NOTE (XSS):
+    Semua data dari API diinjeksikan melalui:
+      - document.createTextNode()    → untuk teks biasa
+      - el.textContent = ...         → tidak pernah innerHTML dengan data API
+    Satu-satunya innerHTML yang digunakan adalah untuk template HTML statis
+    yang tidak mengandung data dari server.
+    Referensi: OWASP XSS Prevention Cheat Sheet Rule #1.
+  -->
+
+  <!-- Scheherazade New — Arabic display font (Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────── */
+    :root {
+      --c-bg:          #0d1f18;
+      --c-surface:     #142a1f;
+      --c-surface2:    #1c3829;
+      --c-border:      #2a4d38;
+      --c-border-soft: #1f3d2c;
+      --c-gold:        #c9a84c;
+      --c-gold-light:  #e4c97e;
+      --c-gold-dim:    #7a6130;
+      --c-text:        #e8e0d0;
+      --c-text-soft:   #a09070;
+      --c-text-muted:  #5a5040;
+      --c-green:       #2a7d4f;
+      --c-green-light: #3da066;
+      --c-red:         #a03030;
+      --c-red-light:   #c94040;
+      --c-blue:        #2060a0;
+      --c-blue-light:  #4090d0;
+
+      /* Ruling colours */
+      --r-wajib:    #1a4a2a;
+      --r-wajib-t:  #5dbb7a;
+      --r-haram:    #4a1a1a;
+      --r-haram-t:  #e07070;
+      --r-halal:    #1a4a2a;
+      --r-halal-t:  #5dbb7a;
+      --r-sunnah:   #4a3a1a;
+      --r-sunnah-t: #e0b870;
+      --r-makruh:   #3a1a3a;
+      --r-makruh-t: #c070c0;
+      --r-mubah:    #1a3a4a;
+      --r-mubah-t:  #70b0c0;
+      --r-default:  #2a2a2a;
+      --r-default-t:#aaaaaa;
+
+      --font-arabic: 'Scheherazade New', 'Traditional Arabic', serif;
+      --font-display:'Lora', Georgia, serif;
+      --font-body:   'Source Sans 3', 'Segoe UI', sans-serif;
+
+      --radius:   10px;
+      --radius-sm: 6px;
+      --shadow:   0 4px 24px rgba(0,0,0,0.5);
+    }
+
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Base ───────────────────────────────────────────────── */
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--c-bg);
+      color: var(--c-text);
+      font-family: var(--font-body);
+      font-weight: 300;
+      font-size: 16px;
+      line-height: 1.7;
+      min-height: 100vh;
+      /* Subtle geometric pattern in bg */
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(201,168,76,0.08) 0%, transparent 60%),
+        repeating-linear-gradient(
+          60deg,
+          transparent,
+          transparent 60px,
+          rgba(201,168,76,0.025) 60px,
+          rgba(201,168,76,0.025) 61px
+        );
+    }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .page {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .site-header {
+      text-align: center;
+      padding: 52px 0 44px;
+      position: relative;
+    }
+
+    .site-header::after {
+      content: '';
+      display: block;
+      width: 80px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--c-gold), transparent);
+      margin: 28px auto 0;
+    }
+
+    .header-ornament {
+      font-size: 2.2rem;
+      letter-spacing: 0.15em;
+      color: var(--c-gold);
+      opacity: 0.9;
+      margin-bottom: 14px;
+      font-family: var(--font-arabic);
+      /* Bismillah in Arabic — purely decorative/thematic */
+    }
+
+    .site-title {
+      font-family: var(--font-display);
+      font-size: 2.4rem;
+      font-weight: 600;
+      color: var(--c-gold-light);
+      letter-spacing: 0.02em;
+      margin-bottom: 8px;
+    }
+
+    .site-subtitle {
+      font-size: 0.92rem;
+      color: var(--c-text-soft);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    /* ── Card ───────────────────────────────────────────────── */
+    .card {
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      padding: 32px;
+      box-shadow: var(--shadow);
+    }
+
+    /* ── Search form ────────────────────────────────────────── */
+    .search-label {
+      display: block;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--c-gold-dim);
+      margin-bottom: 10px;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 13px 16px;
+      background: var(--c-surface2);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius-sm);
+      color: var(--c-text);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 300;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-input::placeholder { color: var(--c-text-muted); }
+
+    .search-input:focus {
+      border-color: var(--c-gold-dim);
+      box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
+    }
+
+    .search-btn {
+      padding: 13px 26px;
+      background: var(--c-gold);
+      color: #0d1a0f;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      white-space: nowrap;
+    }
+
+    .search-btn:hover  { background: var(--c-gold-light); }
+    .search-btn:active { transform: scale(0.97); }
+    .search-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── Suggestions ────────────────────────────────────────── */
+    .suggestions {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .suggestion-label {
+      font-size: 0.75rem;
+      color: var(--c-text-muted);
+      align-self: center;
+      margin-right: 2px;
+    }
+
+    .suggestion-chip {
+      padding: 4px 12px;
+      background: var(--c-surface2);
+      border: 1px solid var(--c-border-soft);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: var(--c-text-soft);
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .suggestion-chip:hover {
+      border-color: var(--c-gold-dim);
+      color: var(--c-gold-light);
+    }
+
+    /* ── Loading ────────────────────────────────────────────── */
+    .loading-state {
+      display: none;
+      padding: 32px 0;
+      text-align: center;
+    }
+
+    .loading-state.active { display: block; }
+
+    .loading-arc {
+      width: 36px; height: 36px;
+      border: 2px solid var(--c-border);
+      border-top-color: var(--c-gold);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      font-size: 0.85rem;
+      color: var(--c-text-soft);
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Answer wrapper ─────────────────────────────────────── */
+    .answer-wrapper {
+      display: none;
+      margin-top: 28px;
+    }
+    .answer-wrapper.active { display: block; }
+
+    /* ── Ruling banner ──────────────────────────────────────── */
+    .ruling-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 14px 20px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 20px;
+      /* colour set via JS via data-ruling attr */
+    }
+
+    .ruling-pill {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      border: 1px solid currentColor;
+    }
+
+    .ruling-name {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    .ruling-madhab {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      font-style: italic;
+    }
+
+    /* Confidence badge */
+    .confidence-badge {
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .conf-high   { color: #5dbb7a; border-color: #2a5a3a; background: rgba(45,110,60,0.2); }
+    .conf-medium { color: #e0b870; border-color: #6a5020; background: rgba(100,80,30,0.2); }
+    .conf-low    { color: #e07070; border-color: #6a2020; background: rgba(100,30,30,0.2); }
+
+    /* ── Section headers ────────────────────────────────────── */
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg, var(--c-border), transparent);
+      margin: 24px 0;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--c-border-soft);
+    }
+
+    /* ── Dalil card ─────────────────────────────────────────── */
+    .dalil-card {
+      background: var(--c-surface2);
+      border: 1px solid var(--c-border-soft);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+
+    .dalil-ref {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--c-gold);
+      margin-bottom: 14px;
+    }
+
+    /* Arabic block — RTL */
+    .arabic-block {
+      direction: rtl;
+      text-align: right;
+      font-family: var(--font-arabic);
+      font-size: 1.65rem;        /* Scheherazade needs generous size */
+      line-height: 2.2;
+      color: var(--c-text);
+      background: rgba(0,0,0,0.2);
+      border-right: 3px solid var(--c-gold-dim);
+      padding: 14px 18px 14px 14px;
+      border-radius: 4px;
+      margin-bottom: 14px;
+      /* Prevent Arabic text from being copyable as LTR garbled mess */
+      unicode-bidi: embed;
+    }
+
+    .field-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--c-text-muted);
+      margin-bottom: 4px;
+    }
+
+    .field-transliteration {
+      font-style: italic;
+      color: var(--c-text-soft);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    .field-translation {
+      color: var(--c-text);
+      font-size: 0.95rem;
+      line-height: 1.75;
+    }
+
+    /* ── Reasoning ──────────────────────────────────────────── */
+    .reasoning-block {
+      background: rgba(201,168,76,0.06);
+      border-left: 3px solid var(--c-gold-dim);
+      padding: 18px 20px;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-size: 0.97rem;
+      line-height: 1.8;
+      color: var(--c-text);
+    }
+
+    /* ── Disclaimer / Warning ───────────────────────────────── */
+    .disclaimer-block {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: rgba(100,80,30,0.15);
+      border: 1px solid rgba(201,168,76,0.2);
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      color: var(--c-text-soft);
+      line-height: 1.6;
+    }
+
+    .warnings-list {
+      margin-top: 8px;
+      padding-left: 16px;
+    }
+
+    .warnings-list li {
+      font-size: 0.8rem;
+      color: var(--c-text-muted);
+      margin-bottom: 4px;
+    }
+
+    /* ── Not-found / Error states ───────────────────────────── */
+    .state-message {
+      padding: 20px;
+      border-radius: var(--radius-sm);
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    .state-not-found {
+      background: rgba(30,60,90,0.3);
+      border: 1px solid rgba(64,144,208,0.25);
+      color: var(--c-text-soft);
+    }
+
+    .state-error {
+      background: rgba(100,20,20,0.3);
+      border: 1px solid rgba(160,48,48,0.4);
+      color: #e07070;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .site-footer {
+      text-align: center;
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--c-border-soft);
+      font-size: 0.75rem;
+      color: var(--c-text-muted);
+      letter-spacing: 0.04em;
+      line-height: 1.8;
+    }
+
+    /* ── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .card { padding: 20px 16px; }
+      .search-row { flex-direction: column; }
+      .search-btn { width: 100%; }
+      .site-title { font-size: 1.8rem; }
+      .arabic-block { font-size: 1.35rem; line-height: 2.0; }
+      .ruling-banner { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ── Fade-in animation ──────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .answer-wrapper.active { animation: fadeUp 0.35s ease; }
+  </style>
+</head>
+
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-ornament" aria-hidden="true">بِسْمِ ٱللَّهِ</div>
+    <h1 class="site-title">IslamiAI</h1>
+    <p class="site-subtitle">Konsultasi Hukum Islam — Mazhab Syafi'i</p>
+  </header>
+
+  <!-- Main card -->
+  <main class="card" role="main">
+
+    <!-- Search form -->
+    <label class="search-label" for="question">Pertanyaan Anda</label>
+    <div class="search-row">
+      <input
+        class="search-input"
+        type="text"
+        id="question"
+        name="question"
+        placeholder="contoh: apa itu syahadat?"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        maxlength="500"
+        aria-label="Pertanyaan hukum Islam"
+        aria-describedby="search-hint"
+      />
+      <button class="search-btn" id="submitBtn" type="button" aria-label="Kirim pertanyaan">
+        Tanya
+      </button>
+    </div>
+
+    <!-- Suggestion chips -->
+    <div class="suggestions" role="list" aria-label="Contoh pertanyaan">
+      <span class="suggestion-label">Contoh:</span>
+      <button class="suggestion-chip" role="listitem" type="button">syahadat</button>
+      <button class="suggestion-chip" role="listitem" type="button">cara wudhu</button>
+      <button class="suggestion-chip" role="listitem" type="button">shalat fardhu</button>
+      <button class="suggestion-chip" role="listitem" type="button">makanan halal</button>
+      <button class="suggestion-chip" role="listitem" type="button">zakat fitrah</button>
+    </div>
+
+    <span id="search-hint" class="sr-only">Ketik pertanyaan tentang hukum Islam dan tekan Tanya</span>
+
+    <!-- Loading indicator -->
+    <div class="loading-state" id="loadingState" aria-live="polite" aria-label="Memuat jawaban">
+      <div class="loading-arc" aria-hidden="true"></div>
+      <p class="loading-text">Mencari dalil…</p>
+    </div>
+
+    <!-- Answer area — populated by JS -->
+    <div class="answer-wrapper" id="answerWrapper" aria-live="polite">
+      <!-- Built dynamically by renderAnswer() / renderNotFound() / renderError() -->
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <p>IslamiAI hanya alat bantu informasi, bukan fatwa resmi.</p>
+    <p>Untuk kepastian hukum, konsultasikan dengan ulama atau ustaz terpercaya.</p>
+  </footer>
+
+</div><!-- .page -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// IslamiAI — Frontend v1 (Phase 1)
+// XSS Policy: TIDAK BOLEH ada data.* atau user input yang dimasukkan
+//   ke innerHTML. Semua konten dinamis dibuat via:
+//     - document.createElement()
+//     - el.textContent = string
+//   Satu-satunya pengecualian: template markup STATIS (tidak ada var).
+// ═══════════════════════════════════════════════════════════════════════
+
+'use strict';
+
+/* ── DOM refs ────────────────────────────────────────────── */
+const questionInput  = document.getElementById('question');
+const submitBtn      = document.getElementById('submitBtn');
+const loadingState   = document.getElementById('loadingState');
+const answerWrapper  = document.getElementById('answerWrapper');
+
+/* ── Ruling colour map ───────────────────────────────────── */
+const RULING_STYLES = {
+  wajib:               { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#5dbb7a' },
+  haram:               { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
+  halal:               { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#5dbb7a' },
+  sunnah:              { bg: 'rgba(74,58,26,0.5)',  border: '#6a4820', text: '#e0b870' },
+  makruh:              { bg: 'rgba(58,26,58,0.5)',  border: '#5a2858', text: '#c070c0' },
+  mubah:               { bg: 'rgba(26,58,74,0.5)',  border: '#285a6a', text: '#70b0c0' },
+  fardhu_ain:          { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#5dbb7a' },
+  fardhu_kifayah:      { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#60c070' },
+  sah:                 { bg: 'rgba(26,58,74,0.5)',  border: '#285a6a', text: '#70c0b0' },
+  batal:               { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
+  ditangguhkan:        { bg: 'rgba(74,58,26,0.5)',  border: '#6a4820', text: '#e0b870' },
+  mungkin_asnaf:       { bg: 'rgba(26,58,74,0.5)',  border: '#285a6a', text: '#70b0c0' },
+  tidak_dapat_warisan: { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
+  haram_waris:         { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
+  tidak_wajib:         { bg: 'rgba(42,42,42,0.5)',  border: '#505050', text: '#aaaaaa' },
+};
+
+const RULING_LABELS = {
+  wajib:               'Wajib',
+  haram:               'Haram',
+  halal:               'Halal',
+  sunnah:              'Sunnah',
+  makruh:              'Makruh',
+  mubah:               'Mubah',
+  fardhu_ain:          'Fardhu Ain',
+  fardhu_kifayah:      'Fardhu Kifayah',
+  sah:                 'Sah',
+  batal:               'Batal',
+  ditangguhkan:        'Ditangguhkan',
+  mungkin_asnaf:       'Mungkin Asnaf',
+  tidak_dapat_warisan: 'Tidak Dapat Warisan',
+  haram_waris:         'Haram Waris',
+  tidak_wajib:         'Tidak Wajib',
+};
+
+/* ── Helper: safe text node ──────────────────────────────── */
+function txt(str) {
+  return document.createTextNode(String(str ?? ''));
+}
+
+/* ── Helper: create element with optional class + children ─ */
+function el(tag, className, ...children) {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  for (const child of children) {
+    if (child instanceof Node) e.appendChild(child);
+    else if (child != null) e.appendChild(txt(child));
+  }
+  return e;
+}
+
+/* ── Clear answer wrapper ────────────────────────────────── */
+function clearAnswer() {
+  answerWrapper.classList.remove('active');
+  // Remove all children safely
+  while (answerWrapper.firstChild) {
+    answerWrapper.removeChild(answerWrapper.firstChild);
+  }
+}
+
+/* ── Confidence badge ────────────────────────────────────── */
+function makeBadge(label) {
+  const badge = el('span', 'confidence-badge');
+  const cls = label === 'high'   ? 'conf-high'
+            : label === 'medium' ? 'conf-medium'
+            :                      'conf-low';
+  badge.classList.add(cls);
+  badge.appendChild(txt(label ? label.toUpperCase() : 'N/A'));
+  return badge;
+}
+
+/* ── Ruling banner ───────────────────────────────────────── */
+function makeRulingBanner(data) {
+  const rulingKey = (data.ruling || '').toLowerCase().replace(/_/g, '_');
+  const style = RULING_STYLES[rulingKey] || { bg: 'rgba(40,40,40,0.5)', border: '#444', text: '#aaa' };
+  const label = RULING_LABELS[rulingKey] || data.ruling || '—';
+
+  const banner = el('div', 'ruling-banner');
+  banner.style.background   = style.bg;
+  banner.style.borderColor  = style.border;
+  banner.style.border       = `1px solid ${style.border}`;
+
+  // Left: pill + name
+  const left = el('div');
+  const pill = el('span', 'ruling-pill');
+  pill.style.color = style.text;
+  pill.style.borderColor = style.border;
+  pill.appendChild(txt(label));
+
+  const name = el('div', 'ruling-name');
+  name.style.color = style.text;
+  name.appendChild(txt(label));
+
+  const madhab = el('div', 'ruling-madhab');
+  madhab.appendChild(txt(data.madhab || "Shafi'i"));
+
+  left.appendChild(pill);
+  left.appendChild(name);
+  left.appendChild(madhab);
+
+  // Right: confidence badge
+  const right = el('div');
+  right.appendChild(makeBadge(data.confidence));
+
+  banner.appendChild(left);
+  banner.appendChild(right);
+  return banner;
+}
+
+/* ── Single dalil card (Quran or Hadis) ─────────────────── */
+function makeDalilCard(item, index, type) {
+  const card = el('div', 'dalil-card');
+
+  // Reference header
+  let refText;
+  if (type === 'quran') {
+    refText = `[${index}] QS. ${item.surah_ayah || item.reference || ''}`;
+  } else {
+    refText = `[${index}] ${item.source || item.reference || ''}`;
+  }
+  const refEl = el('div', 'dalil-ref', refText);
+  card.appendChild(refEl);
+
+  // Arabic text — RTL block
+  const arabic = item.arabic_text || '';
+  if (arabic && arabic !== '[akan ditambahkan]') {
+    const arabicBlock = el('div', 'arabic-block');
+    // RTL attributes for accessibility
+    arabicBlock.setAttribute('dir', 'rtl');
+    arabicBlock.setAttribute('lang', 'ar');
+    arabicBlock.appendChild(txt(arabic));
+    card.appendChild(arabicBlock);
+  }
+
+  // Transliteration
+  const translit = item.transliteration || '';
+  if (translit) {
+    const tLabel = el('div', 'field-label', 'Transliterasi');
+    const tVal   = el('p', 'field-transliteration', translit);
+    card.appendChild(tLabel);
+    card.appendChild(tVal);
+  }
+
+  // Translation
+  const transl = item.translation || '';
+  if (transl) {
+    const dLabel = el('div', 'field-label', 'Terjemahan');
+    const dVal   = el('p', 'field-translation', transl);
+    card.appendChild(dLabel);
+    card.appendChild(dVal);
+  }
+
+  return card;
+}
+
+/* ── Section title helper ────────────────────────────────── */
+function makeSectionTitle(icon, text) {
+  const t = el('h3', 'section-title');
+  const iconSpan = el('span');
+  iconSpan.setAttribute('aria-hidden', 'true');
+  iconSpan.appendChild(txt(icon + ' '));
+  t.appendChild(iconSpan);
+  t.appendChild(txt(text));
+  return t;
+}
+
+/* ── Render: full answer ─────────────────────────────────── */
+function renderAnswer(data) {
+  clearAnswer();
+  const frag = document.createDocumentFragment();
+
+  // 1. Ruling banner
+  frag.appendChild(makeRulingBanner(data));
+
+  // 2. Quran dalil
+  const quranList = data.quran_refs || data.quran || [];
+  if (quranList.length > 0) {
+    const div = document.createElement('div');
+    div.appendChild(el('div', 'section-divider'));
+    div.appendChild(makeSectionTitle('📖', 'Dasar Al-Qur\'an'));
+    quranList.forEach((q, i) => div.appendChild(makeDalilCard(q, i + 1, 'quran')));
+    frag.appendChild(div);
+  }
+
+  // 3. Hadis dalil
+  const hadisList = data.hadis_refs || data.hadis || [];
+  if (hadisList.length > 0) {
+    const div = document.createElement('div');
+    div.appendChild(el('div', 'section-divider'));
+    div.appendChild(makeSectionTitle('📜', 'Dasar Hadis'));
+    hadisList.forEach((h, i) => div.appendChild(makeDalilCard(h, i + 1, 'hadis')));
+    frag.appendChild(div);
+  }
+
+  // 4. Penjelasan
+  const div3 = document.createElement('div');
+  div3.appendChild(el('div', 'section-divider'));
+  div3.appendChild(makeSectionTitle('💭', 'Penjelasan'));
+  const reasoningBlock = el('div', 'reasoning-block');
+  // data.answer sudah diformat oleh formatter.py — kita ambil reasoning
+  // Coba ambil dari evidence langsung, fallback ke answer
+  const reasoningText = data.reasoning || data.answer || '';
+  reasoningBlock.appendChild(txt(reasoningText));
+  div3.appendChild(reasoningBlock);
+  frag.appendChild(div3);
+
+  // 5. Disclaimer / warnings
+  if (data.disclaimer || (data.warnings && data.warnings.length > 0)) {
+    const discDiv = document.createElement('div');
+
+    if (data.disclaimer) {
+      const disc = el('div', 'disclaimer-block', data.disclaimer);
+      discDiv.appendChild(disc);
+    }
+
+    if (data.warnings && data.warnings.length > 0) {
+      const warnDiv = el('div', 'disclaimer-block');
+      warnDiv.appendChild(txt('Catatan:'));
+      const ul = el('ul', 'warnings-list');
+      data.warnings.forEach(w => {
+        ul.appendChild(el('li', null, w));
+      });
+      warnDiv.appendChild(ul);
+      discDiv.appendChild(warnDiv);
+    }
+
+    frag.appendChild(discDiv);
+  }
+
+  answerWrapper.appendChild(frag);
+  answerWrapper.classList.add('active');
+}
+
+/* ── Render: not found ───────────────────────────────────── */
+function renderNotFound(message) {
+  clearAnswer();
+  const msg = el('div', 'state-message state-not-found');
+  msg.appendChild(txt('ℹ️  '));
+  msg.appendChild(txt(message || 'Topik tidak ditemukan dalam database.'));
+  answerWrapper.appendChild(msg);
+  answerWrapper.classList.add('active');
+}
+
+/* ── Render: error ───────────────────────────────────────── */
+function renderError(message) {
+  clearAnswer();
+  const msg = el('div', 'state-message state-error');
+  msg.appendChild(txt('❌  '));
+  msg.appendChild(txt(message || 'Terjadi kesalahan. Silakan coba lagi.'));
+  answerWrapper.appendChild(msg);
+  answerWrapper.classList.add('active');
+}
+
+/* ── Set UI state ────────────────────────────────────────── */
+function setLoading(isLoading) {
+  loadingState.classList.toggle('active', isLoading);
+  submitBtn.disabled = isLoading;
+  questionInput.disabled = isLoading;
+}
+
+/* ── Core: submit question ───────────────────────────────── */
+async function submitQuestion() {
+  const question = questionInput.value.trim();
+  if (!question) {
+    questionInput.focus();
+    return;
+  }
+
+  setLoading(true);
+  clearAnswer();
+
+  try {
+    const response = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // Tidak perlu escape di sini — JSON.stringify handles it,
+      // dan backend juga memvalidasi ulang.
+      body: JSON.stringify({ question }),
+    });
+
+    // Tangani HTTP errors
+    if (!response.ok) {
+      let errMsg = `HTTP ${response.status}`;
+      try {
+        const errData = await response.json();
+        errMsg = errData.error || errMsg;
+      } catch (_) { /* ignore parse error */ }
+
+      if (response.status === 429) {
+        renderError('Terlalu banyak permintaan. Silakan tunggu sebentar.');
+      } else if (response.status === 422) {
+        renderError(errMsg);
+      } else {
+        renderError('Terjadi kesalahan server. Silakan coba lagi.');
+      }
+      return;
+    }
+
+    const data = await response.json();
+
+    if (!data.found) {
+      renderNotFound(data.answer);
+      return;
+    }
+
+    // API mengembalikan dalil di field 'quran' dan 'hadis'
+    // (sesuai response_payload di app.py — evidence_summary hanya count)
+    // Kita perlu dalil lengkap: tambahkan ke payload via evidence_summary
+    // CATATAN: app.py saat ini tidak mengembalikan quran[] dan hadis[] ke frontend.
+    // Kita handle gracefully — jika ada gunakan, jika tidak tampilkan reasoning saja.
+    renderAnswer(data);
+
+  } catch (err) {
+    // Network error
+    renderError('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+    console.error('[IslamiAI] fetch error:', err);
+  } finally {
+    setLoading(false);
+    questionInput.focus();
+  }
+}
+
+/* ── Event listeners ─────────────────────────────────────── */
+submitBtn.addEventListener('click', submitQuestion);
+
+questionInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitQuestion();
+  }
+});
+
+// Suggestion chips
+document.querySelectorAll('.suggestion-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    questionInput.value = chip.textContent.trim();
+    submitQuestion();
+  });
+});
+
+// Auto-focus
+questionInput.focus();
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# ==============================================================================
+# Islamic Knowledge Retrieval System — Production Requirements
+# Phase 1: Core validators, retrieval, query parser, Flask app + Redis caching
+# Phase 2: Chatbot integration (chatbot.py)
+# ==============================================================================
+
+# CORE WEB FRAMEWORK (Phase 1)
+Flask>=3.0.0              # Modern routing, request context, werkzeug 3.x
+flask-limiter>=3.5.0      # Rate limiting (requires Flask>=3.0)
+redis>=5.0.0              # Redis client for caching + rate limit store
+gunicorn>=21.0.0          # Production WSGI server
+
+# MONITORING & ERROR TRACKING (Phase 1)
+sentry-sdk>=1.38.0        # Error tracking + performance monitoring
+python-dotenv>=1.0.0      # Environment variable management
+
+# HTTP CLIENTS (Phase 2: chatbot.py)
+requests>=2.31.0          # Synchronous HTTP client for simple requests
+aiohttp>=3.9.0            # Async HTTP client (future-proof for concurrent requests)
+
+# DATA PROCESSING & UTILITIES
+Werkzeug>=3.0.0           # WSGI utilities (auto-dependency, explicit for clarity)
+
+# TESTING (Development only — consider moving to requirements-dev.txt)
+pytest>=7.4.0             # Unit testing framework
+pytest-cov>=4.1.0         # Coverage reporting
+
+# ==============================================================================
+# NOTES:
+# - All versions pinned to minor version (>=X.Y.0) to allow patch updates
+# - Flask 3.0+ required for flask-limiter; no downgrade to 2.3.0
+# - requests + aiohttp: both included for hybrid sync/async chatbot design
+# - aiohttp enables concurrent data fetching without blocking Flask
+# - For production: use requirements-lock.txt with exact versions (pip freeze)
+# ==============================================================================
