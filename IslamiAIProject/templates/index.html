@@ -1168,6 +1168,43 @@
 
     .hidden { display: none !important; }
 
+    /* Typing cursor */
+    .typing-cursor {
+      display: inline-block;
+      width: 2px; height: 1em;
+      background: var(--sage-400);
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 0.7s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* Sidebar category accordion */
+    .cat-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 10px 5px;
+      cursor: pointer;
+      border-radius: var(--radius-sm);
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .cat-header:hover { background: rgba(255,255,255,0.06); }
+    .cat-label {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.6px; text-transform: uppercase;
+      color: rgba(245,239,227,0.50);
+    }
+    .cat-arrow {
+      font-size: 9px; color: rgba(245,239,227,0.30);
+      transition: transform 0.2s; flex-shrink: 0;
+    }
+    .cat-section.open .cat-arrow { transform: rotate(180deg); }
+    .cat-topics {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.28s ease-out;
+    }
+    .cat-section.open .cat-topics { max-height: 600px; }
+
     /* Mobile collapse */
     .mob-menu-btn, .mob-dalil-btn {
       display: none;
@@ -1341,10 +1378,10 @@
     </div>
   </aside>
 
-</div><!-- .app -->
+  <!-- ── MOBILE BACKDROP (harus di dalam .app agar stacking context sama) ── -->
+  <div class="mob-backdrop" id="mob-backdrop"></div>
 
-<!-- ── MOBILE BACKDROP ────────────────────────────────────────── -->
-<div class="mob-backdrop" id="mob-backdrop"></div>
+</div><!-- .app -->
 
 <!-- ── HISTORY MODAL ─────────────────────────────────────────────── -->
 <div class="modal-overlay" id="history-modal">
@@ -1374,20 +1411,61 @@
 'use strict';
 
 /* ──────────────────────────────────────────────────────────────
-   POPULAR TOPICS
+   TOPICS — diambil dari /api/topics (sumber: shafii_rules)
 ────────────────────────────────────────────────────────────── */
-const TOPICS = [
-  { icon: '☪️',  label: 'Syahadat & Masuk Islam',   query: 'apa itu syahadat dan bagaimana cara masuk islam' },
-  { icon: '💧',  label: 'Cara Wudhu',                 query: 'bagaimana cara wudhu yang benar menurut syafii' },
-  { icon: '🕌',  label: 'Shalat Lima Waktu',           query: 'hukum dan tata cara shalat lima waktu' },
-  { icon: '🌙',  label: 'Puasa Ramadhan',              query: 'hukum puasa ramadhan dan syaratnya' },
-  { icon: '💰',  label: 'Zakat Fitrah',               query: 'hukum dan cara menunaikan zakat fitrah' },
-  { icon: '🍖',  label: 'Makanan Halal & Haram',      query: 'makanan apa saja yang haram dalam islam' },
-  { icon: '💒',  label: 'Syarat Nikah dalam Islam',   query: 'syarat dan rukun nikah menurut mazhab syafii' },
-  { icon: '🏦',  label: 'Hukum Riba & Bank',          query: 'hukum bunga bank konvensional dalam islam' },
-  { icon: '📱',  label: 'Ghibah di Media Sosial',     query: 'hukum ghibah dan gosip di media sosial' },
-  { icon: '❤️',  label: 'Pacaran Sebelum Nikah',      query: 'hukum pacaran dan khalwat dalam islam' },
-];
+let TOPIC_CATEGORIES = [];   // diisi oleh fetchTopics()
+let QUICK_TOPICS     = [];   // 6 topik pertama untuk empty-state
+
+async function fetchTopics() {
+  try {
+    const res  = await fetch('/api/topics');
+    const data = await res.json();
+    TOPIC_CATEGORIES = data.categories || [];
+    // Ambil 1 topik pertama dari setiap kategori sebagai quick-tag
+    QUICK_TOPICS = TOPIC_CATEGORIES
+      .map(cat => cat.topics[0])
+      .filter(Boolean)
+      .slice(0, 6);
+    renderTopics();
+    renderQuickTags();
+  } catch(e) {
+    // Fallback minimal jika API tidak tersedia
+    QUICK_TOPICS = [
+      { icon:'☪️', label:'Syahadat', query:'apa itu syahadat' },
+      { icon:'💧', label:'Wudhu',    query:'cara wudhu yang benar' },
+      { icon:'🕌', label:'Shalat',   query:'tata cara shalat lima waktu' },
+    ];
+    renderQuickTags();
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   TYPING ANIMATION
+────────────────────────────────────────────────────────────── */
+function typeWriter(element, text, speed = 14) {
+  return new Promise(resolve => {
+    element.textContent = '';
+    const cursor = document.createElement('span');
+    cursor.className = 'typing-cursor';
+    element.appendChild(cursor);
+    let i = 0;
+    const tick = () => {
+      if (i < text.length) {
+        // Tulis kata per kata agar lebih cepat dan natural
+        const chunk = text[i] === ' ' ? ' ' : text.slice(i, i + 2) || text[i];
+        cursor.insertAdjacentText('beforebegin', chunk);
+        i += chunk.length;
+        const container = document.getElementById('messages');
+        container.scrollTop = container.scrollHeight;
+        setTimeout(tick, speed);
+      } else {
+        cursor.remove();
+        resolve();
+      }
+    };
+    tick();
+  });
+}
 
 /* ──────────────────────────────────────────────────────────────
    STATE
@@ -1509,12 +1587,29 @@ function renderSidebarSessions() {
    RENDER TOPIC CHIPS (sidebar)
 ────────────────────────────────────────────────────────────── */
 function renderTopics() {
-  document.getElementById('topics-list').innerHTML =
-    TOPICS.map(t => `
-      <button class="topic-chip" data-query="${escHtml(t.query)}">
-        <span class="t-icon">${t.icon}</span>
-        <span class="t-label">${escHtml(t.label)}</span>
-      </button>`).join('');
+  if (!TOPIC_CATEGORIES.length) {
+    document.getElementById('topics-list').innerHTML =
+      '<div style="font-size:11px;color:rgba(245,239,227,0.3);padding:6px 2px;">Memuat topik…</div>';
+    return;
+  }
+  document.getElementById('topics-list').innerHTML = TOPIC_CATEGORIES.map((cat, ci) => `
+    <div class="cat-section" id="cat-${cat.id}">
+      <div class="cat-header" onclick="toggleCat('cat-${cat.id}')">
+        <span class="cat-label">${escHtml(cat.label)}</span>
+        <span class="cat-arrow">▼</span>
+      </div>
+      <div class="cat-topics">
+        ${cat.topics.map(t => `
+          <button class="topic-chip" data-query="${escHtml(t.query)}">
+            <span class="t-icon">${t.icon}</span>
+            <span class="t-label">${escHtml(t.label)}</span>
+          </button>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function toggleCat(id) {
+  document.getElementById(id).classList.toggle('open');
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -1522,7 +1617,7 @@ function renderTopics() {
 ────────────────────────────────────────────────────────────── */
 function renderQuickTags() {
   document.getElementById('quick-tags').innerHTML =
-    TOPICS.slice(0, 5).map(t => `
+    QUICK_TOPICS.map(t => `
       <button class="empty-tag" data-query="${escHtml(t.query)}">${t.icon} ${escHtml(t.label)}</button>`
     ).join('');
 }
@@ -1530,7 +1625,7 @@ function renderQuickTags() {
 /* ──────────────────────────────────────────────────────────────
    RENDER MESSAGES
 ────────────────────────────────────────────────────────────── */
-function renderMessages() {
+function renderMessages(skipLast = false) {
   const sess = getCurrentSession();
   const container = document.getElementById('messages');
   const emptyState = document.getElementById('empty-state');
@@ -1546,7 +1641,8 @@ function renderMessages() {
   const existing = container.querySelectorAll('.msg-row');
   existing.forEach(el => el.remove());
 
-  sess.messages.forEach((msg, idx) => {
+  const msgs = skipLast ? sess.messages.slice(0, -1) : sess.messages;
+  msgs.forEach((msg, idx) => {
     if (msg.role === 'user') {
       container.insertBefore(buildUserRow(msg), container.lastElementChild);
     } else {
@@ -1874,6 +1970,25 @@ async function sendQuestion(question) {
     sess.messages.push(assistantMsg);
     saveToStorage();
 
+    // ── Render semua pesan lama, lalu animasi pesan baru ──
+    renderMessages(true);   // true = skip pesan terakhir
+    const row = buildAssistantRow(assistantMsg, sess.messages.length - 1);
+    container.appendChild(row);
+
+    // Typing animation pada teks jawaban
+    const answerEl = row.querySelector('.answer-text');
+    const footerEl = row.querySelector('.card-footer');
+    const disclaimerEl = row.querySelector('.disclaimer-strip');
+    if (footerEl)     footerEl.style.display = 'none';
+    if (disclaimerEl) disclaimerEl.style.display = 'none';
+
+    await typeWriter(answerEl, assistantMsg.content);
+
+    if (footerEl)     footerEl.style.display = '';
+    if (disclaimerEl) disclaimerEl.style.display = '';
+
+    container.scrollTop = container.scrollHeight;
+
   } catch(e) {
     loadingEl.remove();
     const errMsg = {
@@ -1884,11 +1999,11 @@ async function sendQuestion(question) {
     };
     sess.messages.push(errMsg);
     saveToStorage();
+    renderMessages();
   }
 
   isLoading = false;
   document.getElementById('btn-send').disabled = false;
-  renderMessages();
   renderSidebarSessions();
 }
 
@@ -1913,8 +2028,7 @@ function init() {
   if (sessions.length === 0) createNewSession();
   else currentSessId = sessions[0].id;
 
-  renderTopics();
-  renderQuickTags();
+  fetchTopics();          // async: ambil dari /api/topics lalu render
   renderSidebarSessions();
   renderMessages();
 
@@ -1939,6 +2053,7 @@ function init() {
     renderSidebarSessions();
     renderMessages();
     closeDalilPanel();
+    if (isMobile()) closeMobDrawers();
     textarea.focus();
   });
 
@@ -1988,6 +2103,7 @@ function init() {
       renderSidebarSessions();
       renderMessages();
       closeDalilPanel();
+      if (isMobile()) closeMobDrawers();
     }
   });
 
@@ -1998,6 +2114,7 @@ function init() {
       const q = chip.dataset.query;
       document.getElementById('question-input').value = q;
       autoResize(document.getElementById('question-input'));
+      if (isMobile()) closeMobDrawers();
       doSend();
     }
 

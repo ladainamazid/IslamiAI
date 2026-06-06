@@ -367,3 +367,124 @@ if __name__ == "__main__":
         config.HOST, config.PORT, config.DEBUG, _sentry_enabled, _redis_url[:20],
     )
     app.run(debug=config.DEBUG, host=config.HOST, port=config.PORT)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TOPIC METADATA — sumber kebenaran untuk sidebar frontend
+# Semua key harus sesuai persis dengan key di shafii_rules (islamic_data.py)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_TOPIC_META = {
+    # ── AQIDAH ────────────────────────────────────────────────────────────────
+    'syahadat':                         ('☪️',  'Syahadat & Masuk Islam',               'apa itu syahadat dan bagaimana cara masuk islam'),
+    # ── THAHARAH ──────────────────────────────────────────────────────────────
+    'thaharah_wudhu':                   ('💧',  'Cara Wudhu yang Benar',                'bagaimana cara wudhu yang benar menurut syafii'),
+    'thaharah_mandi_wajib':             ('🚿',  'Mandi Wajib (Ghusl)',                  'bagaimana cara mandi wajib junub yang benar'),
+    'thaharah_tayammum':                ('🏜️',  'Tayammum',                             'kapan boleh tayammum dan bagaimana caranya'),
+    'najis_ringkan':                    ('🧹',  'Najis Ringan (Mukhaffafah)',            'apa itu najis ringan dan cara menyucikannya'),
+    'najis_sedang':                     ('🧼',  'Najis Sedang (Mutawassithah)',          'apa itu najis sedang dan cara menyucikannya'),
+    'najis_berat':                      ('⚠️',  'Najis Berat — Anjing & Babi',          'bagaimana cara menyucikan najis anjing menurut syafii'),
+    # ── SHALAT ────────────────────────────────────────────────────────────────
+    'shalat_lima_waktu':                ('🕌',  'Shalat Lima Waktu',                    'hukum dan tata cara shalat lima waktu'),
+    'shalat_jama_qashar_safar':         ('✈️',  'Shalat Jama & Qashar (Safar)',         'bolehkah shalat jama dan qashar saat bepergian'),
+    'shalat_jumat_kewajiban':           ('📢',  'Kewajiban Shalat Jumat',               'siapa saja yang wajib shalat jumat'),
+    'shalat_sunnah_rawatib':            ('⭐',  'Shalat Sunnah Rawatib',                'apa saja shalat sunnah rawatib dan keutamaannya'),
+    # ── PUASA ─────────────────────────────────────────────────────────────────
+    'puasa_ramadhan':                   ('🌙',  'Puasa Ramadhan',                       'hukum puasa ramadhan dan syaratnya'),
+    'puasa_muallaf_tengah_ramadhan':    ('🆕',  'Puasa Muallaf Tengah Ramadhan',        'saya baru masuk islam di tengah ramadhan apakah wajib puasa'),
+    'puasa_qadha':                      ('📅',  'Qadha (Ganti) Puasa',                  'bagaimana cara qadha puasa yang terlewat'),
+    'puasa_fidyah':                     ('🌾',  'Fidyah Puasa',                         'siapa yang boleh membayar fidyah dan berapa banyaknya'),
+    'puasa_digital_konteks_ibadah':     ('📴',  'Puasa Digital',                        'apakah puasa dari media sosial bernilai ibadah'),
+    # ── ZAKAT ─────────────────────────────────────────────────────────────────
+    'zakat_fitrah':                     ('🎁',  'Zakat Fitrah',                         'hukum dan cara menunaikan zakat fitrah'),
+    'zakat_harta':                      ('💰',  'Zakat Harta (Maal)',                   'bagaimana cara menghitung zakat harta'),
+    'zakat_muallaf':                    ('🤝',  'Zakat untuk Muallaf',                  'apakah muallaf berhak menerima zakat'),
+    'zakat_nishab_emas_perak':          ('🥇',  'Nishab Emas & Perak',                  'berapa nishab zakat emas dan perak'),
+    'zakat_profesi_kontemporer':        ('💼',  'Zakat Profesi & Gaji',                 'bagaimana hukum dan cara menghitung zakat gaji'),
+    'zakat_delapan_asnaf':              ('👥',  '8 Asnaf Penerima Zakat',               'siapa saja 8 golongan yang berhak menerima zakat'),
+    # ── HAJI & UMRAH ──────────────────────────────────────────────────────────
+    'haji_syarat_wajib':                ('🕋',  'Syarat Wajib Haji',                    'apa saja syarat wajib haji dalam islam'),
+    'haji_rukun':                       ('🏃',  'Rukun Haji',                           'apa saja rukun haji yang wajib dipenuhi'),
+    'haji_wajib':                       ('✅',  'Wajib Haji',                           'apa perbedaan rukun haji dan wajib haji'),
+    'umrah_hukum':                      ('🕋',  'Hukum Umrah',                          'apakah umrah hukumnya wajib atau sunnah'),
+    # ── NIKAH & KELUARGA ──────────────────────────────────────────────────────
+    'nikah_syarat_rukun':               ('💒',  'Syarat & Rukun Nikah',                 'syarat dan rukun nikah menurut mazhab syafii'),
+    'nikah_mahar':                      ('💍',  'Mahar (Mas Kawin)',                    'apa itu mahar dan berapa batas minimalnya'),
+    'pernikahan_suami_islam_istri_kafir':('👫', 'Suami Islam, Istri Non-Muslim',         'bolehkah laki-laki muslim menikahi wanita non muslim'),
+    'pernikahan_istri_islam_suami_kafir':('👫', 'Istri Islam, Suami Non-Muslim',         'bagaimana hukum wanita muslimah menikah dengan pria kafir'),
+    'pernikahan_keduanya_islam':        ('👫',  'Keduanya Masuk Islam Bersama',          'jika suami dan istri masuk islam bersama apakah perlu akad ulang'),
+    'talak_jenis':                      ('📄',  'Jenis-Jenis Talak',                    'apa saja jenis talak dalam islam dan perbedaannya'),
+    'khuluk':                           ('⚖️',  'Khuluk (Gugat Cerai Istri)',            'apa itu khuluk dan bagaimana prosesnya'),
+    # ── WARIS & JENAZAH ───────────────────────────────────────────────────────
+    'waris_perbedaan_agama':            ('📜',  'Waris Beda Agama',                     'apakah muslim bisa mewarisi dari keluarga non muslim'),
+    'waris_muallaf_keluarga_non_muslim':('📜',  'Waris Muallaf',                        'bagaimana hak waris muallaf dari keluarga non muslim'),
+    'waris_hijab':                      ('📜',  'Hijab (Penghalang) Waris',             'apa yang dimaksud hijab dalam hukum waris islam'),
+    'jenazah_ghusl':                    ('🕯️',  'Memandikan Jenazah',                   'bagaimana cara memandikan jenazah muslim'),
+    'jenazah_takfin':                   ('🕯️',  'Mengkafani Jenazah',                   'bagaimana cara mengkafani jenazah yang benar'),
+    'jenazah_shalat':                   ('🕯️',  'Shalat Jenazah',                       'bagaimana tata cara shalat jenazah'),
+    'jenazah_dafan':                    ('⚰️',  'Menguburkan Jenazah',                  'bagaimana cara menguburkan jenazah yang sesuai syariat'),
+    'jenazah_keluarga_non_muslim':      ('🕯️',  'Jenazah Keluarga Non-Muslim',          'bolehkah muslim mengurus jenazah keluarga non muslim'),
+    # ── MUAMALAH & KEUANGAN ───────────────────────────────────────────────────
+    'jual_beli_syarat':                 ('🛒',  'Syarat Jual Beli yang Sah',            'apa syarat jual beli yang sah dalam islam'),
+    'riba_jenis':                       ('🏦',  'Jenis-Jenis Riba',                     'apa saja jenis riba yang diharamkan dalam islam'),
+    'bank_konvensional_hukum':          ('🏦',  'Hukum Bank Konvensional',              'hukum bunga bank konvensional dalam islam'),
+    'hutang_piutang':                   ('💸',  'Hutang Piutang (Qardh)',               'apa hukum dan adab hutang piutang dalam islam'),
+    'asuransi_konvensional':            ('📋',  'Hukum Asuransi Konvensional',          'apakah asuransi konvensional haram dalam islam'),
+    'pinjol_fintech':                   ('📲',  'Pinjol & Fintech Lending',             'bagaimana hukum pinjaman online berbunga'),
+    'kripto_investasi':                 ('💎',  'Hukum Kripto & Investasi',             'apakah investasi kripto seperti bitcoin halal'),
+    # ── AKHLAK & SOSIAL ───────────────────────────────────────────────────────
+    'keluarga_non_muslim_hubungan':     ('👨‍👩‍👧', 'Hubungan dengan Keluarga Non-Muslim', 'bagaimana hukum berbuat baik kepada keluarga non muslim'),
+    'aurat_laki_laki':                  ('👔',  'Aurat Laki-Laki',                      'apa batas aurat laki-laki menurut syafii'),
+    'aurat_perempuan_shalat':           ('🧕',  'Aurat Perempuan dalam Shalat',         'apa batas aurat perempuan saat shalat'),
+    'aurat_perempuan_di_luar_shalat':   ('🧕',  'Aurat Perempuan di Luar Shalat',       'apa batas aurat perempuan di hadapan pria ajnabi'),
+    'medsos_ghibah_online':             ('📱',  'Ghibah di Media Sosial',               'hukum ghibah dan gosip di media sosial'),
+    'medsos_hoaks_tabayyun':            ('📰',  'Hoaks & Tabayyun',                     'hukum menyebarkan berita tanpa tabayyun'),
+    'musik_hukum':                      ('🎵',  'Hukum Musik & Lagu',                   'bagaimana hukum mendengarkan musik dalam islam'),
+    'gambar_foto_video':                ('📷',  'Hukum Foto & Video Makhluk Hidup',     'apakah foto dan video makhluk hidup haram'),
+    'kerja_perusahaan_non_halal':       ('💼',  'Kerja di Perusahaan Non-Halal',        'bagaimana hukum bekerja di bank atau pabrik rokok'),
+    'pacaran_sebelum_nikah':            ('❤️',  'Hukum Pacaran',                        'hukum pacaran dan khalwat dalam islam'),
+    'operasi_plastik_kecantikan':       ('💉',  'Operasi Plastik & Kecantikan',         'bagaimana hukum operasi plastik dalam islam'),
+    'lingkungan_hidup_islami':          ('🌿',  'Lingkungan Hidup dalam Islam',         'apa pandangan islam tentang menjaga lingkungan'),
+    'kesehatan_mental_islam':           ('🧠',  'Kesehatan Mental dalam Islam',         'bagaimana islam memandang depresi dan kesehatan mental'),
+    # ── MAKANAN & MINUMAN ─────────────────────────────────────────────────────
+    'makanan_haram_umum':               ('🍖',  'Makanan Haram',                        'makanan apa saja yang haram dalam islam'),
+    'makanan_haram_minuman':            ('🚫',  'Minuman Haram (Khamar)',               'apa saja minuman yang diharamkan dalam islam'),
+    'makanan_halal_penyembelihan':      ('🥩',  'Cara Penyembelihan Halal',             'bagaimana syarat penyembelihan hewan yang halal'),
+}
+
+_TOPIC_CATEGORIES = [
+    ('aqidah',       '☪️ Aqidah & Masuk Islam',    ['syahadat']),
+    ('thaharah',     '💧 Thaharah & Bersuci',       ['thaharah_wudhu','thaharah_mandi_wajib','thaharah_tayammum','najis_ringkan','najis_sedang','najis_berat']),
+    ('shalat',       '🕌 Shalat',                   ['shalat_lima_waktu','shalat_jama_qashar_safar','shalat_jumat_kewajiban','shalat_sunnah_rawatib']),
+    ('puasa',        '🌙 Puasa',                    ['puasa_ramadhan','puasa_muallaf_tengah_ramadhan','puasa_qadha','puasa_fidyah','puasa_digital_konteks_ibadah']),
+    ('zakat',        '💰 Zakat',                    ['zakat_fitrah','zakat_harta','zakat_muallaf','zakat_nishab_emas_perak','zakat_profesi_kontemporer','zakat_delapan_asnaf']),
+    ('haji',         '🕋 Haji & Umrah',             ['haji_syarat_wajib','haji_rukun','haji_wajib','umrah_hukum']),
+    ('nikah',        '💒 Nikah & Keluarga',         ['nikah_syarat_rukun','nikah_mahar','pernikahan_suami_islam_istri_kafir','pernikahan_istri_islam_suami_kafir','pernikahan_keduanya_islam','talak_jenis','khuluk']),
+    ('waris',        '📜 Waris & Jenazah',          ['waris_perbedaan_agama','waris_muallaf_keluarga_non_muslim','waris_hijab','jenazah_ghusl','jenazah_takfin','jenazah_shalat','jenazah_dafan','jenazah_keluarga_non_muslim']),
+    ('muamalah',     '🏦 Muamalah & Keuangan',     ['jual_beli_syarat','riba_jenis','bank_konvensional_hukum','hutang_piutang','asuransi_konvensional','pinjol_fintech','kripto_investasi']),
+    ('akhlak',       '🤲 Akhlak & Sosial',          ['keluarga_non_muslim_hubungan','aurat_laki_laki','aurat_perempuan_shalat','aurat_perempuan_di_luar_shalat','medsos_ghibah_online','medsos_hoaks_tabayyun','musik_hukum','gambar_foto_video','kerja_perusahaan_non_halal','pacaran_sebelum_nikah','operasi_plastik_kecantikan','lingkungan_hidup_islami','kesehatan_mental_islam']),
+    ('makanan',      '🍖 Makanan & Minuman',        ['makanan_haram_umum','makanan_haram_minuman','makanan_halal_penyembelihan']),
+]
+
+
+# ── /api/topics ───────────────────────────────────────────────────────────────
+@app.route("/api/topics")
+def get_topics():
+    """
+    Kembalikan semua topik dari shafii_rules, dikelompokkan per kategori.
+    Hanya topik yang ada di database (shafii_rules) yang dikembalikan.
+    Frontend menggunakan endpoint ini untuk membangun sidebar dinamis.
+    """
+    from islamic_data import shafii_rules
+
+    categories = []
+    for cat_id, cat_label, keys in _TOPIC_CATEGORIES:
+        topics = []
+        for key in keys:
+            if key in shafii_rules and key in _TOPIC_META:
+                icon, label, query = _TOPIC_META[key]
+                topics.append({"key": key, "icon": icon, "label": label, "query": query})
+        if topics:
+            categories.append({"id": cat_id, "label": cat_label, "topics": topics})
+
+    return jsonify({"categories": categories, "total": sum(len(c["topics"]) for c in categories)})
