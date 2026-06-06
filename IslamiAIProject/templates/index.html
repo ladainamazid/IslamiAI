@@ -1,921 +1,1954 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>IslamiAI — Konsultasi Hukum Islam</title>
-
-  <!--
-    SECURITY NOTE (XSS):
-    Semua data dari API diinjeksikan melalui:
-      - document.createTextNode()    → untuk teks biasa
-      - el.textContent = ...         → tidak pernah innerHTML dengan data API
-    Satu-satunya innerHTML yang digunakan adalah untuk template HTML statis
-    yang tidak mengandung data dari server.
-    Referensi: OWASP XSS Prevention Cheat Sheet Rule #1.
-  -->
-
-  <!-- Scheherazade New — Arabic display font (Google Fonts) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet" />
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IslamiAI — Asisten Ilmu Islam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Nunito:wght@300;400;500;600;700&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    /* ── Design tokens ─────────────────────────────────────── */
+    /* ═══════════════════════════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════════════════════════ */
     :root {
-      --c-bg:          #0d1f18;
-      --c-surface:     #142a1f;
-      --c-surface2:    #1c3829;
-      --c-border:      #2a4d38;
-      --c-border-soft: #1f3d2c;
-      --c-gold:        #c9a84c;
-      --c-gold-light:  #e4c97e;
-      --c-gold-dim:    #7a6130;
-      --c-text:        #e8e0d0;
-      --c-text-soft:   #a09070;
-      --c-text-muted:  #5a5040;
-      --c-green:       #2a7d4f;
-      --c-green-light: #3da066;
-      --c-red:         #a03030;
-      --c-red-light:   #c94040;
-      --c-blue:        #2060a0;
-      --c-blue-light:  #4090d0;
+      /* Cream palette */
+      --cream-50:  #FEFCF5;
+      --cream-100: #F5EFE3;
+      --cream-200: #EDE3CC;
+      --cream-300: #DFD0B2;
 
-      /* Ruling colours */
-      --r-wajib:    #1a4a2a;
-      --r-wajib-t:  #5dbb7a;
-      --r-haram:    #4a1a1a;
-      --r-haram-t:  #e07070;
-      --r-halal:    #1a4a2a;
-      --r-halal-t:  #5dbb7a;
-      --r-sunnah:   #4a3a1a;
-      --r-sunnah-t: #e0b870;
-      --r-makruh:   #3a1a3a;
-      --r-makruh-t: #c070c0;
-      --r-mubah:    #1a3a4a;
-      --r-mubah-t:  #70b0c0;
-      --r-default:  #2a2a2a;
-      --r-default-t:#aaaaaa;
+      /* Sage / Forest green — non-army, warm-toned */
+      --sage-50:  #EEF5EB;
+      --sage-100: #D3E8CC;
+      --sage-200: #AACCA0;
+      --sage-300: #7EAD74;
+      --sage-400: #5A8F51;   /* primary interactive */
+      --sage-500: #3F7035;   /* main brand */
+      --sage-600: #2E5426;
+      --sage-700: #1E3A19;   /* sidebar dark */
+      --sage-800: #12241000;
 
-      --font-arabic: 'Scheherazade New', 'Traditional Arabic', serif;
-      --font-display:'Lora', Georgia, serif;
-      --font-body:   'Source Sans 3', 'Segoe UI', sans-serif;
+      /* Gold highlight */
+      --gold-200: #F2E4A8;
+      --gold-300: #DECA6A;
+      --gold-400: #C9A93E;
+      --gold-500: #A07828;
 
-      --radius:   10px;
-      --radius-sm: 6px;
-      --shadow:   0 4px 24px rgba(0,0,0,0.5);
+      /* Warm neutrals */
+      --stone-200: #E8DDD0;
+      --stone-300: #C4B8A4;
+      --stone-400: #9A8874;
+      --stone-500: #6E5F4E;
+
+      /* Semantic text */
+      --text-primary:   #1A2C1C;
+      --text-secondary: #3E5240;
+      --text-muted:     #7C8F7E;
+      --text-inverse:   #F5EFE3;
+
+      /* Surfaces */
+      --bg-main:    var(--cream-100);
+      --bg-card:    #FFFFFF;
+      --bg-sidebar: linear-gradient(170deg, #1E3A19 0%, #2E5426 55%, #183314 100%);
+      --bg-input:   rgba(255,255,255,0.85);
+
+      /* Borders */
+      --border-light:  rgba(63, 112, 53, 0.12);
+      --border-medium: rgba(63, 112, 53, 0.22);
+      --border-strong: rgba(63, 112, 53, 0.40);
+
+      /* Shadows */
+      --shadow-xs: 0 1px 3px rgba(31, 58, 27, 0.07);
+      --shadow-sm: 0 2px 10px rgba(31, 58, 27, 0.09);
+      --shadow-md: 0 6px 28px rgba(31, 58, 27, 0.11);
+      --shadow-lg: 0 16px 56px rgba(31, 58, 27, 0.14);
+
+      /* Layout */
+      --sidebar-w: 252px;
+      --panel-w:   348px;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 22px;
+      --radius-xl: 32px;
+
+      /* Typography */
+      --font-display: 'Cormorant Garamond', Georgia, serif;
+      --font-body:    'Nunito', 'Segoe UI', sans-serif;
+      --font-arabic:  'Scheherazade New', 'Traditional Arabic', serif;
+
+      /* Animation */
+      --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+      --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
-    /* ── Reset ──────────────────────────────────────────────── */
+    /* ═══════════════════════════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════════════════════════ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ── Base ───────────────────────────────────────────────── */
-    html { scroll-behavior: smooth; }
+    html { height: 100%; }
 
     body {
-      background: var(--c-bg);
-      color: var(--c-text);
       font-family: var(--font-body);
-      font-weight: 300;
-      font-size: 16px;
-      line-height: 1.7;
-      min-height: 100vh;
-      /* Subtle geometric pattern in bg */
-      background-image:
-        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(201,168,76,0.08) 0%, transparent 60%),
-        repeating-linear-gradient(
-          60deg,
-          transparent,
-          transparent 60px,
-          rgba(201,168,76,0.025) 60px,
-          rgba(201,168,76,0.025) 61px
-        );
+      background: var(--bg-main);
+      color: var(--text-primary);
+      height: 100%;
+      overflow: hidden;
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Layout ─────────────────────────────────────────────── */
-    .page {
-      max-width: 780px;
-      margin: 0 auto;
-      padding: 0 20px 60px;
-    }
-
-    /* ── Header ─────────────────────────────────────────────── */
-    .site-header {
-      text-align: center;
-      padding: 52px 0 44px;
-      position: relative;
-    }
-
-    .site-header::after {
+    /* Geometric dot pattern on main bg */
+    body::before {
       content: '';
-      display: block;
-      width: 80px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--c-gold), transparent);
-      margin: 28px auto 0;
+      position: fixed; inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(63, 112, 53, 0.07) 1.2px, transparent 1.2px);
+      background-size: 26px 26px;
+      pointer-events: none;
+      z-index: 0;
     }
 
-    .header-ornament {
-      font-size: 2.2rem;
-      letter-spacing: 0.15em;
-      color: var(--c-gold);
-      opacity: 0.9;
-      margin-bottom: 14px;
-      font-family: var(--font-arabic);
-      /* Bismillah in Arabic — purely decorative/thematic */
+    /* ═══════════════════════════════════════════════════════════════
+       APP SHELL — 3-COLUMN GRID
+    ═══════════════════════════════════════════════════════════════ */
+    .app {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr var(--panel-w);
+      grid-template-rows: 100vh;
+      height: 100vh;
+      position: relative;
+      z-index: 1;
     }
 
-    .site-title {
-      font-family: var(--font-display);
-      font-size: 2.4rem;
-      font-weight: 600;
-      color: var(--c-gold-light);
-      letter-spacing: 0.02em;
-      margin-bottom: 8px;
-    }
-
-    .site-subtitle {
-      font-size: 0.92rem;
-      color: var(--c-text-soft);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    /* ── Card ───────────────────────────────────────────────── */
-    .card {
-      background: var(--c-surface);
-      border: 1px solid var(--c-border);
-      border-radius: var(--radius);
-      padding: 32px;
-      box-shadow: var(--shadow);
-    }
-
-    /* ── Search form ────────────────────────────────────────── */
-    .search-label {
-      display: block;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--c-gold-dim);
-      margin-bottom: 10px;
-    }
-
-    .search-row {
+    /* ═══════════════════════════════════════════════════════════════
+       LEFT SIDEBAR
+    ═══════════════════════════════════════════════════════════════ */
+    .sidebar {
+      background: var(--bg-sidebar);
       display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* Arabesque overlay pattern on sidebar */
+    .sidebar::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(45deg, transparent 47%, rgba(255,255,255,0.025) 47%, rgba(255,255,255,0.025) 53%, transparent 53%),
+        linear-gradient(-45deg, transparent 47%, rgba(255,255,255,0.025) 47%, rgba(255,255,255,0.025) 53%, transparent 53%);
+      background-size: 24px 24px;
+      pointer-events: none;
+    }
+
+    .sidebar-header {
+      padding: 24px 18px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
       gap: 10px;
+      margin-bottom: 16px;
     }
 
-    .search-input {
-      flex: 1;
-      padding: 13px 16px;
-      background: var(--c-surface2);
-      border: 1px solid var(--c-border);
-      border-radius: var(--radius-sm);
-      color: var(--c-text);
+    .brand-icon {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--gold-300), var(--gold-400));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-arabic);
+      font-size: 18px;
+      color: var(--sage-700);
+      flex-shrink: 0;
+      box-shadow: 0 3px 12px rgba(201, 169, 62, 0.35);
+    }
+
+    .brand-text h1 {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--cream-50);
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+    }
+
+    .brand-text p {
+      font-size: 10.5px;
+      color: rgba(245, 239, 227, 0.55);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    .btn-new-chat {
+      width: 100%;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: var(--radius-md);
+      color: var(--cream-100);
       font-family: var(--font-body);
-      font-size: 1rem;
-      font-weight: 300;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    .search-input::placeholder { color: var(--c-text-muted); }
-
-    .search-input:focus {
-      border-color: var(--c-gold-dim);
-      box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
-    }
-
-    .search-btn {
-      padding: 13px 26px;
-      background: var(--c-gold);
-      color: #0d1a0f;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-family: var(--font-body);
-      font-size: 0.95rem;
+      font-size: 13.5px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s, transform 0.15s;
-      white-space: nowrap;
+      display: flex; align-items: center; gap: 8px;
+      transition: background 0.2s, border-color 0.2s;
+      letter-spacing: 0.2px;
     }
 
-    .search-btn:hover  { background: var(--c-gold-light); }
-    .search-btn:active { transform: scale(0.97); }
-    .search-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-new-chat:hover {
+      background: rgba(255,255,255,0.15);
+      border-color: rgba(255,255,255,0.22);
+    }
 
-    /* ── Suggestions ────────────────────────────────────────── */
-    .suggestions {
-      margin-top: 12px;
+    .btn-new-chat .icon { font-size: 16px; opacity: 0.85; }
+
+    /* Session history */
+    .sidebar-section {
+      padding: 14px 18px 8px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: rgba(245, 239, 227, 0.40);
+      margin-bottom: 8px;
+      padding-left: 2px;
+    }
+
+    .session-list {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto;
+      max-height: 170px;
     }
 
-    .suggestion-label {
-      font-size: 0.75rem;
-      color: var(--c-text-muted);
-      align-self: center;
-      margin-right: 2px;
-    }
+    .session-list::-webkit-scrollbar { width: 3px; }
+    .session-list::-webkit-scrollbar-track { background: transparent; }
+    .session-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 99px; }
 
-    .suggestion-chip {
-      padding: 4px 12px;
-      background: var(--c-surface2);
-      border: 1px solid var(--c-border-soft);
-      border-radius: 20px;
-      font-size: 0.8rem;
-      color: var(--c-text-soft);
-      cursor: pointer;
-      transition: border-color 0.2s, color 0.2s;
-    }
-
-    .suggestion-chip:hover {
-      border-color: var(--c-gold-dim);
-      color: var(--c-gold-light);
-    }
-
-    /* ── Loading ────────────────────────────────────────────── */
-    .loading-state {
-      display: none;
-      padding: 32px 0;
-      text-align: center;
-    }
-
-    .loading-state.active { display: block; }
-
-    .loading-arc {
-      width: 36px; height: 36px;
-      border: 2px solid var(--c-border);
-      border-top-color: var(--c-gold);
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-      margin: 0 auto 12px;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .loading-text {
-      font-size: 0.85rem;
-      color: var(--c-text-soft);
-      letter-spacing: 0.05em;
-    }
-
-    /* ── Answer wrapper ─────────────────────────────────────── */
-    .answer-wrapper {
-      display: none;
-      margin-top: 28px;
-    }
-    .answer-wrapper.active { display: block; }
-
-    /* ── Ruling banner ──────────────────────────────────────── */
-    .ruling-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding: 14px 20px;
+    .session-item {
+      display: flex; align-items: center;
+      padding: 8px 10px;
       border-radius: var(--radius-sm);
-      margin-bottom: 20px;
-      /* colour set via JS via data-ruling attr */
-    }
-
-    .ruling-pill {
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 4px 14px;
-      border-radius: 20px;
-      border: 1px solid currentColor;
-    }
-
-    .ruling-name {
-      font-family: var(--font-display);
-      font-size: 1.3rem;
-      font-weight: 600;
-    }
-
-    .ruling-madhab {
-      font-size: 0.8rem;
-      opacity: 0.7;
-      font-style: italic;
-    }
-
-    /* Confidence badge */
-    .confidence-badge {
-      font-size: 0.7rem;
-      padding: 3px 10px;
-      border-radius: 12px;
-      border: 1px solid;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .conf-high   { color: #5dbb7a; border-color: #2a5a3a; background: rgba(45,110,60,0.2); }
-    .conf-medium { color: #e0b870; border-color: #6a5020; background: rgba(100,80,30,0.2); }
-    .conf-low    { color: #e07070; border-color: #6a2020; background: rgba(100,30,30,0.2); }
-
-    /* ── Section headers ────────────────────────────────────── */
-    .section-divider {
-      height: 1px;
-      background: linear-gradient(90deg, var(--c-border), transparent);
-      margin: 24px 0;
-    }
-
-    .section-title {
-      font-family: var(--font-display);
-      font-size: 0.88rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--c-gold);
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s;
       gap: 8px;
     }
 
-    .section-title::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--c-border-soft);
+    .session-item:hover { background: rgba(255,255,255,0.08); }
+    .session-item.active { background: rgba(201, 169, 62, 0.18); }
+
+    .session-icon { font-size: 13px; opacity: 0.6; flex-shrink: 0; }
+
+    .session-info { flex: 1; min-width: 0; }
+
+    .session-title {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: rgba(245, 239, 227, 0.85);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    /* ── Dalil card ─────────────────────────────────────────── */
-    .dalil-card {
-      background: var(--c-surface2);
-      border: 1px solid var(--c-border-soft);
-      border-radius: var(--radius-sm);
-      padding: 20px;
-      margin-bottom: 12px;
+    .session-date {
+      font-size: 10px;
+      color: rgba(245, 239, 227, 0.38);
+      margin-top: 1px;
     }
 
-    .dalil-ref {
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--c-gold);
-      margin-bottom: 14px;
-    }
-
-    /* Arabic block — RTL */
-    .arabic-block {
-      direction: rtl;
-      text-align: right;
-      font-family: var(--font-arabic);
-      font-size: 1.65rem;        /* Scheherazade needs generous size */
-      line-height: 2.2;
-      color: var(--c-text);
-      background: rgba(0,0,0,0.2);
-      border-right: 3px solid var(--c-gold-dim);
-      padding: 14px 18px 14px 14px;
+    .session-del {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(245, 239, 227, 0.30);
+      font-size: 14px;
+      padding: 2px 4px;
       border-radius: 4px;
-      margin-bottom: 14px;
-      /* Prevent Arabic text from being copyable as LTR garbled mess */
-      unicode-bidi: embed;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      flex-shrink: 0;
     }
 
-    .field-label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--c-text-muted);
-      margin-bottom: 4px;
+    .session-item:hover .session-del { opacity: 1; }
+    .session-del:hover { color: #ff7777; }
+
+    /* Popular topics */
+    .topics-section {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 18px 18px;
     }
 
-    .field-transliteration {
+    .topics-section::-webkit-scrollbar { width: 3px; }
+    .topics-section::-webkit-scrollbar-track { background: transparent; }
+    .topics-section::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 99px; }
+
+    .topic-chip {
+      display: flex; align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.15s;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+
+    .topic-chip:hover { background: rgba(255,255,255,0.07); }
+
+    .topic-chip .t-icon {
+      font-size: 14px;
+      width: 22px; text-align: center;
+      flex-shrink: 0;
+    }
+
+    .topic-chip .t-label {
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 500;
+      color: rgba(245, 239, 227, 0.75);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      padding: 14px 18px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-footer .bismillah {
+      font-family: var(--font-arabic);
+      font-size: 14px;
+      color: rgba(245, 239, 227, 0.40);
+      line-height: 1;
+      flex: 1;
+    }
+
+    .btn-history {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: var(--radius-sm);
+      padding: 6px 10px;
+      font-family: var(--font-body);
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(245, 239, 227, 0.65);
+      cursor: pointer;
+      letter-spacing: 0.4px;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-history:hover { background: rgba(255,255,255,0.14); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       CENTER — MAIN CHAT
+    ═══════════════════════════════════════════════════════════════ */
+    .chat-area {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      border-right: 1px solid var(--border-light);
+    }
+
+    .chat-header {
+      padding: 18px 24px 16px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(245, 239, 227, 0.70);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      flex-shrink: 0;
+    }
+
+    .chat-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: 0.2px;
+    }
+
+    .chat-title span {
+      color: var(--sage-500);
       font-style: italic;
-      color: var(--c-text-soft);
-      font-size: 0.9rem;
-      line-height: 1.6;
-      margin-bottom: 10px;
     }
 
-    .field-translation {
-      color: var(--c-text);
-      font-size: 0.95rem;
-      line-height: 1.75;
+    .chat-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 1px;
     }
 
-    /* ── Reasoning ──────────────────────────────────────────── */
-    .reasoning-block {
-      background: rgba(201,168,76,0.06);
-      border-left: 3px solid var(--c-gold-dim);
-      padding: 18px 20px;
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      font-size: 0.97rem;
-      line-height: 1.8;
-      color: var(--c-text);
+    .header-badge {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      background: var(--sage-50);
+      border: 1px solid var(--border-medium);
+      border-radius: 99px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--sage-600);
+      letter-spacing: 0.3px;
     }
 
-    /* ── Disclaimer / Warning ───────────────────────────────── */
-    .disclaimer-block {
-      margin-top: 16px;
-      padding: 12px 16px;
-      background: rgba(100,80,30,0.15);
-      border: 1px solid rgba(201,168,76,0.2);
-      border-radius: var(--radius-sm);
-      font-size: 0.82rem;
-      color: var(--c-text-soft);
-      line-height: 1.6;
+    .header-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--sage-400);
+      animation: pulse 2s ease infinite;
     }
 
-    .warnings-list {
-      margin-top: 8px;
-      padding-left: 16px;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
     }
 
-    .warnings-list li {
-      font-size: 0.8rem;
-      color: var(--c-text-muted);
-      margin-bottom: 4px;
+    /* Messages area */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
     }
 
-    /* ── Not-found / Error states ───────────────────────────── */
-    .state-message {
-      padding: 20px;
-      border-radius: var(--radius-sm);
-      font-size: 0.95rem;
+    .messages::-webkit-scrollbar { width: 5px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb {
+      background: var(--border-medium);
+      border-radius: 99px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      animation: fadeIn 0.6s var(--ease-out);
+    }
+
+    .empty-bismillah {
+      font-family: var(--font-arabic);
+      font-size: 42px;
+      color: var(--sage-400);
+      line-height: 1.4;
+      margin-bottom: 16px;
+      opacity: 0.75;
+    }
+
+    .empty-title {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .empty-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 320px;
       line-height: 1.7;
     }
 
-    .state-not-found {
-      background: rgba(30,60,90,0.3);
-      border: 1px solid rgba(64,144,208,0.25);
-      color: var(--c-text-soft);
+    .empty-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 24px;
+      justify-content: center;
     }
 
-    .state-error {
-      background: rgba(100,20,20,0.3);
-      border: 1px solid rgba(160,48,48,0.4);
-      color: #e07070;
+    .empty-tag {
+      padding: 7px 14px;
+      background: var(--sage-50);
+      border: 1px solid var(--border-medium);
+      border-radius: 99px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--sage-600);
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
     }
 
-    /* ── Footer ─────────────────────────────────────────────── */
-    .site-footer {
-      text-align: center;
-      margin-top: 48px;
-      padding-top: 24px;
-      border-top: 1px solid var(--c-border-soft);
-      font-size: 0.75rem;
-      color: var(--c-text-muted);
-      letter-spacing: 0.04em;
-      line-height: 1.8;
+    .empty-tag:hover {
+      background: var(--sage-100);
+      box-shadow: var(--shadow-sm);
+      transform: translateY(-1px);
     }
 
-    /* ── Responsive ─────────────────────────────────────────── */
-    @media (max-width: 600px) {
-      .card { padding: 20px 16px; }
-      .search-row { flex-direction: column; }
-      .search-btn { width: 100%; }
-      .site-title { font-size: 1.8rem; }
-      .arabic-block { font-size: 1.35rem; line-height: 2.0; }
-      .ruling-banner { flex-direction: column; align-items: flex-start; }
+    /* Message rows */
+    .msg-row {
+      display: flex;
+      flex-direction: column;
+      animation: slideUp 0.35s var(--ease-out);
     }
 
-    /* ── Fade-in animation ──────────────────────────────────── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(12px); }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(18px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    .answer-wrapper.active { animation: fadeUp 0.35s ease; }
+
+    .msg-row.user { align-items: flex-end; }
+    .msg-row.assistant { align-items: flex-start; }
+
+    .msg-meta {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+      padding: 0 4px;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* User bubble */
+    .bubble-user {
+      max-width: 72%;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, var(--sage-500), var(--sage-600));
+      color: #fff;
+      border-radius: var(--radius-lg) var(--radius-lg) 6px var(--radius-lg);
+      font-size: 14px;
+      line-height: 1.65;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Assistant card */
+    .card-answer {
+      max-width: 88%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-left: 3px solid var(--sage-400);
+      border-radius: 6px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .card-answer.rejected {
+      border-left-color: var(--stone-400);
+    }
+
+    .card-body {
+      padding: 16px 20px;
+    }
+
+    .answer-text {
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+    }
+
+    .card-footer {
+      padding: 10px 20px 14px;
+      display: flex; align-items: center; gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Confidence badge */
+    .badge-conf {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .badge-conf.high   { background: #E6F5E4; color: #2E6B26; border: 1px solid #B3DBA8; }
+    .badge-conf.medium { background: #FDF5E4; color: #7A5A18; border: 1px solid #E8CFA0; }
+    .badge-conf.low,
+    .badge-conf.insufficient { background: #FAEAEA; color: #882828; border: 1px solid #E0AAAA; }
+
+    .badge-conf::before {
+      content: '';
+      width: 5px; height: 5px;
+      border-radius: 50%;
+    }
+
+    .badge-conf.high::before   { background: #3F7035; }
+    .badge-conf.medium::before { background: #C9A93E; }
+    .badge-conf.low::before,
+    .badge-conf.insufficient::before { background: #B83232; }
+
+    /* Action buttons on card */
+    .card-actions {
+      display: flex; gap: 6px;
+      margin-left: auto;
+    }
+
+    .btn-action {
+      background: none;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+      padding: 5px 10px;
+      font-family: var(--font-body);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .btn-action:hover {
+      background: var(--sage-50);
+      border-color: var(--border-medium);
+      color: var(--sage-600);
+    }
+
+    .btn-dalil {
+      background: var(--sage-50);
+      border-color: var(--border-medium);
+      color: var(--sage-600);
+    }
+
+    .btn-dalil:hover {
+      background: var(--sage-100);
+    }
+
+    /* Disclaimer strip */
+    .disclaimer-strip {
+      margin: 0 20px 14px;
+      padding: 8px 12px;
+      background: #FDF9EC;
+      border: 1px solid #EEDD99;
+      border-radius: var(--radius-sm);
+      font-size: 11.5px;
+      color: #7A6520;
+      line-height: 1.5;
+    }
+
+    /* Loading indicator */
+    .msg-loading {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: 6px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+      width: fit-content;
+      animation: slideUp 0.3s var(--ease-out);
+    }
+
+    .dots {
+      display: flex; gap: 4px;
+    }
+
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--sage-300);
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+
+    .dot:nth-child(2) { animation-delay: 0.18s; }
+    .dot:nth-child(3) { animation-delay: 0.36s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30%            { transform: translateY(-7px); }
+    }
+
+    .loading-label {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* Input area */
+    .input-area {
+      padding: 16px 24px 20px;
+      border-top: 1px solid var(--border-light);
+      background: rgba(245, 239, 227, 0.80);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      flex-shrink: 0;
+    }
+
+    .input-wrap {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: var(--bg-input);
+      border: 1.5px solid var(--border-medium);
+      border-radius: var(--radius-xl);
+      padding: 12px 14px 12px 20px;
+      box-shadow: var(--shadow-sm);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-wrap:focus-within {
+      border-color: var(--sage-400);
+      box-shadow: 0 0 0 3px rgba(63,112,53,0.10), var(--shadow-sm);
+    }
+
+    #question-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-family: var(--font-body);
+      font-size: 14.5px;
+      color: var(--text-primary);
+      resize: none;
+      min-height: 24px;
+      max-height: 120px;
+      line-height: 1.55;
+    }
+
+    #question-input::placeholder { color: var(--text-muted); }
+
+    .btn-send {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--sage-400), var(--sage-600));
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 3px 12px rgba(63,112,53,0.35);
+    }
+
+    .btn-send:hover { opacity: 0.92; transform: scale(1.04); }
+    .btn-send:active { transform: scale(0.96); }
+    .btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-send svg { width: 18px; height: 18px; fill: #fff; }
+
+    .input-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       RIGHT PANEL — DALIL
+    ═══════════════════════════════════════════════════════════════ */
+    .dalil-panel {
+      display: flex;
+      flex-direction: column;
+      background: #FFFFFF;
+      overflow: hidden;
+      transition: width 0.35s var(--ease-out), opacity 0.3s;
+    }
+
+    .dalil-panel.collapsed {
+      width: 0 !important;
+      opacity: 0;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, var(--sage-50), var(--cream-50));
+    }
+
+    .panel-title-block { flex: 1; }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .panel-subtitle {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .btn-close-panel {
+      background: var(--cream-200);
+      border: none;
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      color: var(--text-secondary);
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn-close-panel:hover { background: var(--cream-300); }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-content::-webkit-scrollbar { width: 4px; }
+    .panel-content::-webkit-scrollbar-track { background: transparent; }
+    .panel-content::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 99px; }
+
+    /* Panel empty */
+    .panel-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+
+    .panel-empty .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+    .panel-empty p { font-size: 13px; line-height: 1.6; }
+
+    /* Ruling badge in panel */
+    .ruling-card {
+      padding: 12px 14px;
+      background: linear-gradient(135deg, var(--sage-50), var(--cream-50));
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-md);
+    }
+
+    .ruling-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .ruling-value {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--sage-600);
+      text-transform: capitalize;
+    }
+
+    .ruling-meta {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    /* Dalil entry (quran / hadis) */
+    .dalil-group-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding-left: 2px;
+    }
+
+    .dalil-entry {
+      background: var(--cream-50);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+
+    .dalil-entry:hover { box-shadow: var(--shadow-xs); }
+
+    .dalil-toggle {
+      width: 100%;
+      padding: 12px 14px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px;
+    }
+
+    .dalil-ref {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--sage-600);
+      letter-spacing: 0.3px;
+    }
+
+    .dalil-preview {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+      text-align: left;
+    }
+
+    .dalil-chevron {
+      font-size: 10px;
+      color: var(--text-muted);
+      transition: transform 0.25s;
+      flex-shrink: 0;
+    }
+
+    .dalil-entry.expanded .dalil-chevron { transform: rotate(180deg); }
+
+    .dalil-body {
+      padding: 0 14px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s var(--ease-out), padding 0.25s;
+    }
+
+    .dalil-entry.expanded .dalil-body {
+      max-height: 400px;
+      padding-bottom: 14px;
+    }
+
+    .dalil-arabic {
+      font-family: var(--font-arabic);
+      font-size: 22px;
+      line-height: 2;
+      color: var(--text-primary);
+      direction: rtl;
+      text-align: right;
+      margin-bottom: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .dalil-translit {
+      font-size: 12px;
+      color: var(--sage-500);
+      font-style: italic;
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+
+    .dalil-translation {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+
+    .dalil-source {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      padding: 4px 8px;
+      background: var(--cream-200);
+      border-radius: var(--radius-sm);
+      display: inline-block;
+    }
+
+    /* Panel footer */
+    .panel-footer {
+      padding: 14px 22px;
+      border-top: 1px solid var(--border-light);
+      flex-shrink: 0;
+    }
+
+    .madhab-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--sage-600);
+      padding: 5px 10px;
+      background: var(--sage-50);
+      border: 1px solid var(--border-medium);
+      border-radius: 99px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       HISTORY MODAL
+    ═══════════════════════════════════════════════════════════════ */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(26, 44, 28, 0.55);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal-box {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      width: 100%; max-width: 560px;
+      max-height: 80vh;
+      display: flex; flex-direction: column;
+      box-shadow: var(--shadow-lg);
+      transform: translateY(16px);
+      transition: transform 0.3s var(--ease-out);
+    }
+
+    .modal-overlay.open .modal-box { transform: translateY(0); }
+
+    .modal-head {
+      padding: 22px 24px 16px;
+      border-bottom: 1px solid var(--border-light);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .modal-head h2 {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .btn-modal-close {
+      background: var(--cream-200);
+      border: none;
+      border-radius: 8px;
+      width: 32px; height: 32px;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--text-secondary);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+
+    .btn-modal-close:hover { background: var(--cream-300); }
+
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+
+    .modal-session-row {
+      display: flex; align-items: center;
+      padding: 12px 14px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      gap: 12px;
+    }
+
+    .modal-session-row:hover {
+      background: var(--sage-50);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .modal-session-date {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .modal-session-title {
+      flex: 1;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .modal-session-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 3px 8px;
+      background: var(--cream-200);
+      border-radius: 99px;
+      flex-shrink: 0;
+    }
+
+    .btn-del-session {
+      background: none; border: none;
+      padding: 4px 6px; cursor: pointer;
+      color: var(--stone-400);
+      font-size: 14px;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .btn-del-session:hover { background: #FAEAEA; color: #882828; }
+
+    .modal-foot {
+      padding: 14px 24px;
+      border-top: 1px solid var(--border-light);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .modal-foot-info {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .btn-clear-all {
+      background: none;
+      border: 1px solid #DDA0A0;
+      border-radius: var(--radius-sm);
+      padding: 7px 14px;
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #882828;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-clear-all:hover { background: #FAEAEA; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       TOAST
+    ═══════════════════════════════════════════════════════════════ */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: var(--sage-700);
+      color: var(--cream-50);
+      padding: 10px 20px;
+      border-radius: 99px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: var(--shadow-md);
+      z-index: 200;
+      transition: transform 0.3s var(--ease-spring), opacity 0.25s;
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       UTILITIES
+    ═══════════════════════════════════════════════════════════════ */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .hidden { display: none !important; }
+
+    /* Mobile collapse */
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 0 1fr 0;
+      }
+      .sidebar, .dalil-panel { display: none; }
+    }
   </style>
 </head>
-
 <body>
-<div class="page">
 
-  <!-- Header -->
-  <header class="site-header">
-    <div class="header-ornament" aria-hidden="true">بِسْمِ ٱللَّهِ</div>
-    <h1 class="site-title">IslamiAI</h1>
-    <p class="site-subtitle">Konsultasi Hukum Islam — Mazhab Syafi'i</p>
-  </header>
+<!-- ═══════════════════════════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════════════════════════════ -->
+<div class="app">
 
-  <!-- Main card -->
-  <main class="card" role="main">
-
-    <!-- Search form -->
-    <label class="search-label" for="question">Pertanyaan Anda</label>
-    <div class="search-row">
-      <input
-        class="search-input"
-        type="text"
-        id="question"
-        name="question"
-        placeholder="contoh: apa itu syahadat?"
-        autocomplete="off"
-        autocorrect="off"
-        spellcheck="false"
-        maxlength="500"
-        aria-label="Pertanyaan hukum Islam"
-        aria-describedby="search-hint"
-      />
-      <button class="search-btn" id="submitBtn" type="button" aria-label="Kirim pertanyaan">
-        Tanya
+  <!-- ── LEFT SIDEBAR ──────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <div class="brand-icon">&#1604;</div>
+        <div class="brand-text">
+          <h1>IslamiAI</h1>
+          <p>Asisten Ilmu Islam</p>
+        </div>
+      </div>
+      <button class="btn-new-chat" id="btn-new-chat">
+        <span class="icon">✦</span> Percakapan Baru
       </button>
     </div>
 
-    <!-- Suggestion chips -->
-    <div class="suggestions" role="list" aria-label="Contoh pertanyaan">
-      <span class="suggestion-label">Contoh:</span>
-      <button class="suggestion-chip" role="listitem" type="button">syahadat</button>
-      <button class="suggestion-chip" role="listitem" type="button">cara wudhu</button>
-      <button class="suggestion-chip" role="listitem" type="button">shalat fardhu</button>
-      <button class="suggestion-chip" role="listitem" type="button">makanan halal</button>
-      <button class="suggestion-chip" role="listitem" type="button">zakat fitrah</button>
+    <!-- Recent sessions -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Percakapan Terakhir</div>
+      <div class="session-list" id="session-list">
+        <!-- Rendered by JS -->
+      </div>
     </div>
 
-    <span id="search-hint" class="sr-only">Ketik pertanyaan tentang hukum Islam dan tekan Tanya</span>
-
-    <!-- Loading indicator -->
-    <div class="loading-state" id="loadingState" aria-live="polite" aria-label="Memuat jawaban">
-      <div class="loading-arc" aria-hidden="true"></div>
-      <p class="loading-text">Mencari dalil…</p>
+    <!-- Popular topics -->
+    <div class="topics-section">
+      <div class="sidebar-label" style="padding-left:0; margin-bottom:8px;">Topik Populer</div>
+      <div id="topics-list">
+        <!-- Rendered by JS -->
+      </div>
     </div>
 
-    <!-- Answer area — populated by JS -->
-    <div class="answer-wrapper" id="answerWrapper" aria-live="polite">
-      <!-- Built dynamically by renderAnswer() / renderNotFound() / renderError() -->
+    <div class="sidebar-footer">
+      <span class="bismillah">بِسْمِ ٱللَّٰهِ</span>
+      <button class="btn-history" id="btn-open-history">📋 Semua Riwayat</button>
+    </div>
+  </aside>
+
+  <!-- ── CENTER: MAIN CHAT ─────────────────────────────────────── -->
+  <main class="chat-area">
+    <div class="chat-header">
+      <div>
+        <div class="chat-title">Tanya <span>Ilmu Islam</span></div>
+        <div class="chat-subtitle">Fikih Syafi'i · Dalil Quran & Hadis Shahih</div>
+      </div>
+      <div class="header-badge">Online</div>
     </div>
 
+    <div class="messages" id="messages">
+      <!-- Empty state shown initially -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-bismillah">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</div>
+        <div class="empty-title">Assalamu'alaikum</div>
+        <div class="empty-desc">
+          Silakan tanyakan topik fikih, hukum Islam, tata cara ibadah, atau pertanyaan islami lainnya.
+        </div>
+        <div class="empty-tags" id="quick-tags">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea
+          id="question-input"
+          placeholder="Tulis pertanyaan Anda di sini…"
+          rows="1"
+        ></textarea>
+        <button class="btn-send" id="btn-send" aria-label="Kirim">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter untuk kirim · Shift+Enter untuk baris baru · jawaban berdasarkan dalil sahih</div>
+    </div>
   </main>
 
-  <!-- Footer -->
-  <footer class="site-footer">
-    <p>IslamiAI hanya alat bantu informasi, bukan fatwa resmi.</p>
-    <p>Untuk kepastian hukum, konsultasikan dengan ulama atau ustaz terpercaya.</p>
-  </footer>
+  <!-- ── RIGHT PANEL: DALIL ────────────────────────────────────── -->
+  <aside class="dalil-panel collapsed" id="dalil-panel">
+    <div class="panel-header">
+      <div class="panel-title-block">
+        <div class="panel-title">Panel Dalil</div>
+        <div class="panel-subtitle">Referensi Quran & Hadis</div>
+      </div>
+      <button class="btn-close-panel" id="btn-close-panel" aria-label="Tutup panel">✕</button>
+    </div>
 
-</div><!-- .page -->
+    <div class="panel-content" id="panel-content">
+      <div class="panel-empty">
+        <div class="icon">📖</div>
+        <p>Pilih jawaban untuk melihat dalil Quran dan Hadis yang mendasarinya.</p>
+      </div>
+    </div>
 
+    <div class="panel-footer" id="panel-footer" style="display:none">
+      <span class="madhab-tag">⚖️ Mazhab Syafi'i</span>
+    </div>
+  </aside>
+
+</div><!-- .app -->
+
+<!-- ── HISTORY MODAL ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="history-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>Riwayat Percakapan</h2>
+      <button class="btn-modal-close" id="btn-modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-session-list">
+      <!-- Rendered by JS -->
+    </div>
+    <div class="modal-foot">
+      <span class="modal-foot-info" id="modal-info">0 sesi tersimpan</span>
+      <button class="btn-clear-all" id="btn-clear-all">Hapus Semua</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ─────────────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════════ -->
 <script>
-// ═══════════════════════════════════════════════════════════════════════
-// IslamiAI — Frontend v1 (Phase 1)
-// XSS Policy: TIDAK BOLEH ada data.* atau user input yang dimasukkan
-//   ke innerHTML. Semua konten dinamis dibuat via:
-//     - document.createElement()
-//     - el.textContent = string
-//   Satu-satunya pengecualian: template markup STATIS (tidak ada var).
-// ═══════════════════════════════════════════════════════════════════════
-
 'use strict';
 
-/* ── DOM refs ────────────────────────────────────────────── */
-const questionInput  = document.getElementById('question');
-const submitBtn      = document.getElementById('submitBtn');
-const loadingState   = document.getElementById('loadingState');
-const answerWrapper  = document.getElementById('answerWrapper');
+/* ──────────────────────────────────────────────────────────────
+   POPULAR TOPICS
+────────────────────────────────────────────────────────────── */
+const TOPICS = [
+  { icon: '☪️',  label: 'Syahadat & Masuk Islam',   query: 'apa itu syahadat dan bagaimana cara masuk islam' },
+  { icon: '💧',  label: 'Cara Wudhu',                 query: 'bagaimana cara wudhu yang benar menurut syafii' },
+  { icon: '🕌',  label: 'Shalat Lima Waktu',           query: 'hukum dan tata cara shalat lima waktu' },
+  { icon: '🌙',  label: 'Puasa Ramadhan',              query: 'hukum puasa ramadhan dan syaratnya' },
+  { icon: '💰',  label: 'Zakat Fitrah',               query: 'hukum dan cara menunaikan zakat fitrah' },
+  { icon: '🍖',  label: 'Makanan Halal & Haram',      query: 'makanan apa saja yang haram dalam islam' },
+  { icon: '💒',  label: 'Syarat Nikah dalam Islam',   query: 'syarat dan rukun nikah menurut mazhab syafii' },
+  { icon: '🏦',  label: 'Hukum Riba & Bank',          query: 'hukum bunga bank konvensional dalam islam' },
+  { icon: '📱',  label: 'Ghibah di Media Sosial',     query: 'hukum ghibah dan gosip di media sosial' },
+  { icon: '❤️',  label: 'Pacaran Sebelum Nikah',      query: 'hukum pacaran dan khalwat dalam islam' },
+];
 
-/* ── Ruling colour map ───────────────────────────────────── */
-const RULING_STYLES = {
-  wajib:               { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#5dbb7a' },
-  haram:               { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
-  halal:               { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#5dbb7a' },
-  sunnah:              { bg: 'rgba(74,58,26,0.5)',  border: '#6a4820', text: '#e0b870' },
-  makruh:              { bg: 'rgba(58,26,58,0.5)',  border: '#5a2858', text: '#c070c0' },
-  mubah:               { bg: 'rgba(26,58,74,0.5)',  border: '#285a6a', text: '#70b0c0' },
-  fardhu_ain:          { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#5dbb7a' },
-  fardhu_kifayah:      { bg: 'rgba(26,74,42,0.5)',  border: '#2a5a38', text: '#60c070' },
-  sah:                 { bg: 'rgba(26,58,74,0.5)',  border: '#285a6a', text: '#70c0b0' },
-  batal:               { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
-  ditangguhkan:        { bg: 'rgba(74,58,26,0.5)',  border: '#6a4820', text: '#e0b870' },
-  mungkin_asnaf:       { bg: 'rgba(26,58,74,0.5)',  border: '#285a6a', text: '#70b0c0' },
-  tidak_dapat_warisan: { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
-  haram_waris:         { bg: 'rgba(74,26,26,0.5)',  border: '#6a2828', text: '#e07070' },
-  tidak_wajib:         { bg: 'rgba(42,42,42,0.5)',  border: '#505050', text: '#aaaaaa' },
-};
+/* ──────────────────────────────────────────────────────────────
+   STATE
+────────────────────────────────────────────────────────────── */
+const STORAGE_KEY = 'islamiai_sessions_v2';
+let sessions      = [];
+let currentSessId = null;
+let isLoading     = false;
 
-const RULING_LABELS = {
-  wajib:               'Wajib',
-  haram:               'Haram',
-  halal:               'Halal',
-  sunnah:              'Sunnah',
-  makruh:              'Makruh',
-  mubah:               'Mubah',
-  fardhu_ain:          'Fardhu Ain',
-  fardhu_kifayah:      'Fardhu Kifayah',
-  sah:                 'Sah',
-  batal:               'Batal',
-  ditangguhkan:        'Ditangguhkan',
-  mungkin_asnaf:       'Mungkin Asnaf',
-  tidak_dapat_warisan: 'Tidak Dapat Warisan',
-  haram_waris:         'Haram Waris',
-  tidak_wajib:         'Tidak Wajib',
-};
-
-/* ── Helper: safe text node ──────────────────────────────── */
-function txt(str) {
-  return document.createTextNode(String(str ?? ''));
-}
-
-/* ── Helper: create element with optional class + children ─ */
-function el(tag, className, ...children) {
-  const e = document.createElement(tag);
-  if (className) e.className = className;
-  for (const child of children) {
-    if (child instanceof Node) e.appendChild(child);
-    else if (child != null) e.appendChild(txt(child));
-  }
-  return e;
-}
-
-/* ── Clear answer wrapper ────────────────────────────────── */
-function clearAnswer() {
-  answerWrapper.classList.remove('active');
-  // Remove all children safely
-  while (answerWrapper.firstChild) {
-    answerWrapper.removeChild(answerWrapper.firstChild);
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    sessions = raw ? JSON.parse(raw) : [];
+  } catch(e) {
+    sessions = [];
   }
 }
 
-/* ── Confidence badge ────────────────────────────────────── */
-function makeBadge(label) {
-  const badge = el('span', 'confidence-badge');
-  const cls = label === 'high'   ? 'conf-high'
-            : label === 'medium' ? 'conf-medium'
-            :                      'conf-low';
-  badge.classList.add(cls);
-  badge.appendChild(txt(label ? label.toUpperCase() : 'N/A'));
-  return badge;
+function saveToStorage() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  } catch(e) { /* quota exceeded — silently ignore */ }
 }
 
-/* ── Ruling banner ───────────────────────────────────────── */
-function makeRulingBanner(data) {
-  const rulingKey = (data.ruling || '').toLowerCase().replace(/_/g, '_');
-  const style = RULING_STYLES[rulingKey] || { bg: 'rgba(40,40,40,0.5)', border: '#444', text: '#aaa' };
-  const label = RULING_LABELS[rulingKey] || data.ruling || '—';
-
-  const banner = el('div', 'ruling-banner');
-  banner.style.background   = style.bg;
-  banner.style.borderColor  = style.border;
-  banner.style.border       = `1px solid ${style.border}`;
-
-  // Left: pill + name
-  const left = el('div');
-  const pill = el('span', 'ruling-pill');
-  pill.style.color = style.text;
-  pill.style.borderColor = style.border;
-  pill.appendChild(txt(label));
-
-  const name = el('div', 'ruling-name');
-  name.style.color = style.text;
-  name.appendChild(txt(label));
-
-  const madhab = el('div', 'ruling-madhab');
-  madhab.appendChild(txt(data.madhab || "Shafi'i"));
-
-  left.appendChild(pill);
-  left.appendChild(name);
-  left.appendChild(madhab);
-
-  // Right: confidence badge
-  const right = el('div');
-  right.appendChild(makeBadge(data.confidence));
-
-  banner.appendChild(left);
-  banner.appendChild(right);
-  return banner;
+function getCurrentSession() {
+  return sessions.find(s => s.id === currentSessId) || null;
 }
 
-/* ── Single dalil card (Quran or Hadis) ─────────────────── */
-function makeDalilCard(item, index, type) {
-  const card = el('div', 'dalil-card');
-
-  // Reference header
-  let refText;
-  if (type === 'quran') {
-    refText = `[${index}] QS. ${item.surah_ayah || item.reference || ''}`;
-  } else {
-    refText = `[${index}] ${item.source || item.reference || ''}`;
-  }
-  const refEl = el('div', 'dalil-ref', refText);
-  card.appendChild(refEl);
-
-  // Arabic text — RTL block
-  const arabic = item.arabic_text || '';
-  if (arabic && arabic !== '[akan ditambahkan]') {
-    const arabicBlock = el('div', 'arabic-block');
-    // RTL attributes for accessibility
-    arabicBlock.setAttribute('dir', 'rtl');
-    arabicBlock.setAttribute('lang', 'ar');
-    arabicBlock.appendChild(txt(arabic));
-    card.appendChild(arabicBlock);
-  }
-
-  // Transliteration
-  const translit = item.transliteration || '';
-  if (translit) {
-    const tLabel = el('div', 'field-label', 'Transliterasi');
-    const tVal   = el('p', 'field-transliteration', translit);
-    card.appendChild(tLabel);
-    card.appendChild(tVal);
-  }
-
-  // Translation
-  const transl = item.translation || '';
-  if (transl) {
-    const dLabel = el('div', 'field-label', 'Terjemahan');
-    const dVal   = el('p', 'field-translation', transl);
-    card.appendChild(dLabel);
-    card.appendChild(dVal);
-  }
-
-  return card;
+function createNewSession() {
+  const sess = {
+    id:       crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+    title:    'Percakapan baru',
+    date:     new Date().toISOString(),
+    messages: [],
+  };
+  sessions.unshift(sess);
+  currentSessId = sess.id;
+  saveToStorage();
+  return sess;
 }
 
-/* ── Section title helper ────────────────────────────────── */
-function makeSectionTitle(icon, text) {
-  const t = el('h3', 'section-title');
-  const iconSpan = el('span');
-  iconSpan.setAttribute('aria-hidden', 'true');
-  iconSpan.appendChild(txt(icon + ' '));
-  t.appendChild(iconSpan);
-  t.appendChild(txt(text));
-  return t;
-}
-
-/* ── Render: full answer ─────────────────────────────────── */
-function renderAnswer(data) {
-  clearAnswer();
-  const frag = document.createDocumentFragment();
-
-  // 1. Ruling banner
-  frag.appendChild(makeRulingBanner(data));
-
-  // 2. Quran dalil
-  const quranList = data.quran_refs || data.quran || [];
-  if (quranList.length > 0) {
-    const div = document.createElement('div');
-    div.appendChild(el('div', 'section-divider'));
-    div.appendChild(makeSectionTitle('📖', 'Dasar Al-Qur\'an'));
-    quranList.forEach((q, i) => div.appendChild(makeDalilCard(q, i + 1, 'quran')));
-    frag.appendChild(div);
-  }
-
-  // 3. Hadis dalil
-  const hadisList = data.hadis_refs || data.hadis || [];
-  if (hadisList.length > 0) {
-    const div = document.createElement('div');
-    div.appendChild(el('div', 'section-divider'));
-    div.appendChild(makeSectionTitle('📜', 'Dasar Hadis'));
-    hadisList.forEach((h, i) => div.appendChild(makeDalilCard(h, i + 1, 'hadis')));
-    frag.appendChild(div);
-  }
-
-  // 4. Penjelasan
-  const div3 = document.createElement('div');
-  div3.appendChild(el('div', 'section-divider'));
-  div3.appendChild(makeSectionTitle('💭', 'Penjelasan'));
-  const reasoningBlock = el('div', 'reasoning-block');
-  // data.answer sudah diformat oleh formatter.py — kita ambil reasoning
-  // Coba ambil dari evidence langsung, fallback ke answer
-  const reasoningText = data.reasoning || data.answer || '';
-  reasoningBlock.appendChild(txt(reasoningText));
-  div3.appendChild(reasoningBlock);
-  frag.appendChild(div3);
-
-  // 5. Disclaimer / warnings
-  if (data.disclaimer || (data.warnings && data.warnings.length > 0)) {
-    const discDiv = document.createElement('div');
-
-    if (data.disclaimer) {
-      const disc = el('div', 'disclaimer-block', data.disclaimer);
-      discDiv.appendChild(disc);
+function deleteSessionById(id) {
+  sessions = sessions.filter(s => s.id !== id);
+  if (currentSessId === id) {
+    if (sessions.length > 0) {
+      currentSessId = sessions[0].id;
+    } else {
+      createNewSession();
     }
-
-    if (data.warnings && data.warnings.length > 0) {
-      const warnDiv = el('div', 'disclaimer-block');
-      warnDiv.appendChild(txt('Catatan:'));
-      const ul = el('ul', 'warnings-list');
-      data.warnings.forEach(w => {
-        ul.appendChild(el('li', null, w));
-      });
-      warnDiv.appendChild(ul);
-      discDiv.appendChild(warnDiv);
-    }
-
-    frag.appendChild(discDiv);
   }
-
-  answerWrapper.appendChild(frag);
-  answerWrapper.classList.add('active');
+  saveToStorage();
 }
 
-/* ── Render: not found ───────────────────────────────────── */
-function renderNotFound(message) {
-  clearAnswer();
-  const msg = el('div', 'state-message state-not-found');
-  msg.appendChild(txt('ℹ️  '));
-  msg.appendChild(txt(message || 'Topik tidak ditemukan dalam database.'));
-  answerWrapper.appendChild(msg);
-  answerWrapper.classList.add('active');
+function clearAllSessions() {
+  sessions = [];
+  createNewSession();
+  saveToStorage();
 }
 
-/* ── Render: error ───────────────────────────────────────── */
-function renderError(message) {
-  clearAnswer();
-  const msg = el('div', 'state-message state-error');
-  msg.appendChild(txt('❌  '));
-  msg.appendChild(txt(message || 'Terjadi kesalahan. Silakan coba lagi.'));
-  answerWrapper.appendChild(msg);
-  answerWrapper.classList.add('active');
+/* ──────────────────────────────────────────────────────────────
+   UI HELPERS
+────────────────────────────────────────────────────────────── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
 }
 
-/* ── Set UI state ────────────────────────────────────────── */
-function setLoading(isLoading) {
-  loadingState.classList.toggle('active', isLoading);
-  submitBtn.disabled = isLoading;
-  questionInput.disabled = isLoading;
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
-/* ── Core: submit question ───────────────────────────────── */
-async function submitQuestion() {
-  const question = questionInput.value.trim();
-  if (!question) {
-    questionInput.focus();
+function formatDate(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60)   return 'Baru saja';
+  if (diff < 3600) return Math.floor(diff/60) + ' menit lalu';
+  if (diff < 86400) return Math.floor(diff/3600) + ' jam lalu';
+  return d.toLocaleDateString('id-ID', { day:'numeric', month:'short' });
+}
+
+function confidenceBadge(label, score) {
+  const pct = score ? Math.round(score * 100) : 0;
+  const map = { high: 'Keyakinan Tinggi', medium: 'Keyakinan Sedang', low: 'Keyakinan Rendah', insufficient: 'Kurang Dalil' };
+  const text = map[label] || label;
+  return `<span class="badge-conf ${label}">${text} ${pct > 0 ? '('+pct+'%)' : ''}</span>`;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   RENDER SIDEBAR SESSIONS
+────────────────────────────────────────────────────────────── */
+function renderSidebarSessions() {
+  const list = document.getElementById('session-list');
+  const recent = sessions.slice(0, 6);
+
+  if (recent.length === 0) {
+    list.innerHTML = '<div style="font-size:12px;color:rgba(245,239,227,0.35);padding:6px 2px;">Belum ada percakapan</div>';
     return;
   }
 
-  setLoading(true);
-  clearAnswer();
+  list.innerHTML = recent.map(s => {
+    const active = s.id === currentSessId ? 'active' : '';
+    return `
+      <div class="session-item ${active}" data-id="${s.id}">
+        <span class="session-icon">💬</span>
+        <div class="session-info">
+          <div class="session-title">${escHtml(s.title)}</div>
+          <div class="session-date">${formatDate(s.date)}</div>
+        </div>
+        <button class="session-del" data-del="${s.id}" title="Hapus sesi">✕</button>
+      </div>`;
+  }).join('');
+}
 
-  try {
-    const response = await fetch('/api/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // Tidak perlu escape di sini — JSON.stringify handles it,
-      // dan backend juga memvalidasi ulang.
-      body: JSON.stringify({ question }),
+/* ──────────────────────────────────────────────────────────────
+   RENDER TOPIC CHIPS (sidebar)
+────────────────────────────────────────────────────────────── */
+function renderTopics() {
+  document.getElementById('topics-list').innerHTML =
+    TOPICS.map(t => `
+      <button class="topic-chip" data-query="${escHtml(t.query)}">
+        <span class="t-icon">${t.icon}</span>
+        <span class="t-label">${escHtml(t.label)}</span>
+      </button>`).join('');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   RENDER QUICK TAGS (empty state)
+────────────────────────────────────────────────────────────── */
+function renderQuickTags() {
+  document.getElementById('quick-tags').innerHTML =
+    TOPICS.slice(0, 5).map(t => `
+      <button class="empty-tag" data-query="${escHtml(t.query)}">${t.icon} ${escHtml(t.label)}</button>`
+    ).join('');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   RENDER MESSAGES
+────────────────────────────────────────────────────────────── */
+function renderMessages() {
+  const sess = getCurrentSession();
+  const container = document.getElementById('messages');
+  const emptyState = document.getElementById('empty-state');
+
+  if (!sess || sess.messages.length === 0) {
+    emptyState.style.display = '';
+    const old = container.querySelectorAll('.msg-row, .msg-loading');
+    old.forEach(el => el.remove());
+    return;
+  }
+
+  emptyState.style.display = 'none';
+  const existing = container.querySelectorAll('.msg-row');
+  existing.forEach(el => el.remove());
+
+  sess.messages.forEach((msg, idx) => {
+    if (msg.role === 'user') {
+      container.insertBefore(buildUserRow(msg), container.lastElementChild);
+    } else {
+      container.insertBefore(buildAssistantRow(msg, idx), container.lastElementChild);
+    }
+  });
+
+  container.scrollTop = container.scrollHeight;
+}
+
+function buildUserRow(msg) {
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `
+    <div class="msg-meta">Anda · ${formatDate(msg.ts)}</div>
+    <div class="bubble-user">${escHtml(msg.content)}</div>`;
+  return row;
+}
+
+function buildAssistantRow(msg, idx) {
+  const row = document.createElement('div');
+  row.className = 'msg-row assistant';
+
+  const hasDalil = msg.data && ((msg.data.quran && msg.data.quran.length) || (msg.data.hadis && msg.data.hadis.length));
+  const isRejected = msg.data && !msg.data.found;
+
+  let badgeHtml  = '';
+  let actionsHtml = '';
+  let disclaimerHtml = '';
+
+  if (msg.data) {
+    if (msg.data.confidence && msg.data.confidence_score !== undefined) {
+      badgeHtml = confidenceBadge(msg.data.confidence, msg.data.confidence_score);
+    }
+    if (msg.data.disclaimer) {
+      disclaimerHtml = `<div class="disclaimer-strip">${escHtml(msg.data.disclaimer)}</div>`;
+    }
+  }
+
+  actionsHtml = `
+    <div class="card-actions">
+      ${hasDalil ? `<button class="btn-action btn-dalil" data-msg-idx="${idx}">📖 Dalil</button>` : ''}
+      <button class="btn-action btn-copy-ans" data-msg-idx="${idx}">📋 Salin</button>
+      <button class="btn-action btn-share-ans" data-msg-idx="${idx}">↗ Bagikan</button>
+    </div>`;
+
+  row.innerHTML = `
+    <div class="msg-meta">IslamiAI · ${formatDate(msg.ts)}</div>
+    <div class="card-answer ${isRejected ? 'rejected' : ''}">
+      <div class="card-body">
+        <div class="answer-text">${escHtml(msg.content)}</div>
+      </div>
+      ${disclaimerHtml}
+      <div class="card-footer">
+        ${badgeHtml}
+        ${actionsHtml}
+      </div>
+    </div>`;
+
+  return row;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   DALIL PANEL
+────────────────────────────────────────────────────────────── */
+function showDalilPanel(msgIdx) {
+  const sess = getCurrentSession();
+  if (!sess) return;
+
+  const msg = sess.messages[msgIdx];
+  if (!msg || !msg.data) return;
+
+  const { quran = [], hadis = [], ruling, madhab, reasoning } = msg.data;
+  const panelContent = document.getElementById('panel-content');
+  const panelFooter  = document.getElementById('panel-footer');
+  const panel        = document.getElementById('dalil-panel');
+
+  let html = '';
+
+  // Ruling card
+  if (ruling) {
+    html += `
+      <div class="ruling-card">
+        <div class="ruling-label">Hukum</div>
+        <div class="ruling-value">${escHtml(ruling.replace(/_/g,' '))}</div>
+        ${reasoning ? `<div class="ruling-meta" style="margin-top:8px;font-size:12px;line-height:1.6;">${escHtml(reasoning)}</div>` : ''}
+      </div>`;
+  }
+
+  // Quran refs
+  if (quran.length > 0) {
+    html += `<div class="dalil-group-label">Al-Quran (${quran.length} ayat)</div>`;
+    quran.forEach((v, i) => {
+      const ref = v.reference || v.surah_ayah || '';
+      const preview = v.translation ? v.translation.substring(0, 40) + '…' : '';
+      html += `
+        <div class="dalil-entry" id="qe-${i}">
+          <button class="dalil-toggle" onclick="toggleDalil('qe-${i}')">
+            <div>
+              <div class="dalil-ref">QS. ${escHtml(ref)}</div>
+              <div class="dalil-preview">${escHtml(preview)}</div>
+            </div>
+            <span class="dalil-chevron">▼</span>
+          </button>
+          <div class="dalil-body">
+            ${v.arabic_text ? `<div class="dalil-arabic">${escHtml(v.arabic_text)}</div>` : ''}
+            ${v.transliteration ? `<div class="dalil-translit">${escHtml(v.transliteration)}</div>` : ''}
+            ${v.translation ? `<div class="dalil-translation">"${escHtml(v.translation)}"</div>` : ''}
+            ${v.source_check ? `<span class="dalil-source">${escHtml(v.source_check)}</span>` : ''}
+          </div>
+        </div>`;
     });
+  }
 
-    // Tangani HTTP errors
-    if (!response.ok) {
-      let errMsg = `HTTP ${response.status}`;
-      try {
-        const errData = await response.json();
-        errMsg = errData.error || errMsg;
-      } catch (_) { /* ignore parse error */ }
+  // Hadis refs
+  if (hadis.length > 0) {
+    html += `<div class="dalil-group-label" style="margin-top:8px;">Hadis (${hadis.length} hadis)</div>`;
+    hadis.forEach((h, i) => {
+      const ref = h.reference || h.source || '';
+      const preview = h.translation ? h.translation.substring(0, 40) + '…' : '';
+      const authLabel = h.authenticity === 'sahih' ? '✅ Sahih' : (h.authenticity === 'hasan' ? '🟡 Hasan' : h.authenticity || '');
+      html += `
+        <div class="dalil-entry" id="he-${i}">
+          <button class="dalil-toggle" onclick="toggleDalil('he-${i}')">
+            <div>
+              <div class="dalil-ref">${escHtml(ref)} <small style="font-weight:400;color:var(--text-muted)">${authLabel}</small></div>
+              <div class="dalil-preview">${escHtml(preview)}</div>
+            </div>
+            <span class="dalil-chevron">▼</span>
+          </button>
+          <div class="dalil-body">
+            ${h.arabic_text && !h.arabic_text.includes('PENDING') ? `<div class="dalil-arabic">${escHtml(h.arabic_text)}</div>` : ''}
+            ${h.transliteration && !h.transliteration.includes('pending') ? `<div class="dalil-translit">${escHtml(h.transliteration)}</div>` : ''}
+            ${h.translation ? `<div class="dalil-translation">"${escHtml(h.translation)}"</div>` : ''}
+            ${h.grading ? `<span class="dalil-source">${escHtml(h.grading)}</span>` : ''}
+          </div>
+        </div>`;
+    });
+  }
 
-      if (response.status === 429) {
-        renderError('Terlalu banyak permintaan. Silakan tunggu sebentar.');
-      } else if (response.status === 422) {
-        renderError(errMsg);
-      } else {
-        renderError('Terjadi kesalahan server. Silakan coba lagi.');
-      }
-      return;
-    }
+  if (!html) {
+    html = `<div class="panel-empty"><div class="icon">📭</div><p>Tidak ada dalil tersedia untuk jawaban ini.</p></div>`;
+  }
 
-    const data = await response.json();
+  panelContent.innerHTML = html;
+  panelFooter.style.display = madhab ? '' : 'none';
 
-    if (!data.found) {
-      renderNotFound(data.answer);
-      return;
-    }
+  panel.classList.remove('collapsed');
+}
 
-    // API mengembalikan dalil di field 'quran' dan 'hadis'
-    // (sesuai response_payload di app.py — evidence_summary hanya count)
-    // Kita perlu dalil lengkap: tambahkan ke payload via evidence_summary
-    // CATATAN: app.py saat ini tidak mengembalikan quran[] dan hadis[] ke frontend.
-    // Kita handle gracefully — jika ada gunakan, jika tidak tampilkan reasoning saja.
-    renderAnswer(data);
+function toggleDalil(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('expanded');
+}
 
-  } catch (err) {
-    // Network error
-    renderError('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
-    console.error('[IslamiAI] fetch error:', err);
-  } finally {
-    setLoading(false);
-    questionInput.focus();
+function closeDalilPanel() {
+  document.getElementById('dalil-panel').classList.add('collapsed');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   COPY & SHARE
+────────────────────────────────────────────────────────────── */
+function copyAnswer(idx) {
+  const sess = getCurrentSession();
+  if (!sess) return;
+  const msg = sess.messages[idx];
+  if (!msg) return;
+  navigator.clipboard.writeText(msg.content).then(() => {
+    showToast('✅ Teks berhasil disalin!');
+  }).catch(() => {
+    showToast('Gagal menyalin teks.');
+  });
+}
+
+async function shareAnswer(idx) {
+  const sess = getCurrentSession();
+  if (!sess) return;
+  const msg = sess.messages[idx];
+  if (!msg) return;
+  const shareText = 'IslamiAI — Jawaban:\n\n' + msg.content + '\n\n(Powered by IslamiAI · ilmuislam.ai)';
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'IslamiAI', text: shareText });
+    } catch(e) { /* user cancelled */ }
+  } else {
+    navigator.clipboard.writeText(shareText).then(() => {
+      showToast('📋 Teks disalin untuk dibagikan!');
+    });
   }
 }
 
-/* ── Event listeners ─────────────────────────────────────── */
-submitBtn.addEventListener('click', submitQuestion);
+/* ──────────────────────────────────────────────────────────────
+   HISTORY MODAL
+────────────────────────────────────────────────────────────── */
+function openHistoryModal() {
+  renderHistoryModal();
+  document.getElementById('history-modal').classList.add('open');
+}
 
-questionInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    submitQuestion();
+function closeHistoryModal() {
+  document.getElementById('history-modal').classList.remove('open');
+}
+
+function renderHistoryModal() {
+  const list = document.getElementById('modal-session-list');
+  const info = document.getElementById('modal-info');
+  info.textContent = sessions.length + ' sesi tersimpan';
+
+  if (sessions.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Belum ada riwayat percakapan.</div>';
+    return;
   }
-});
 
-// Suggestion chips
-document.querySelectorAll('.suggestion-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    questionInput.value = chip.textContent.trim();
-    submitQuestion();
+  list.innerHTML = sessions.map(s => `
+    <div class="modal-session-row" data-load="${s.id}">
+      <div class="modal-session-date">${formatDate(s.date)}</div>
+      <div class="modal-session-title">${escHtml(s.title)}</div>
+      <div class="modal-session-count">${s.messages.length} pesan</div>
+      <button class="btn-del-session" data-del-modal="${s.id}" title="Hapus">✕</button>
+    </div>`).join('');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   API CALL
+────────────────────────────────────────────────────────────── */
+async function sendQuestion(question) {
+  if (isLoading || !question.trim()) return;
+  isLoading = true;
+
+  let sess = getCurrentSession();
+  if (!sess) sess = createNewSession();
+
+  // Update session title on first message
+  if (sess.messages.length === 0) {
+    sess.title = question.length > 38 ? question.substring(0, 38) + '…' : question;
+    // Move to front
+    sessions = sessions.filter(s => s.id !== sess.id);
+    sessions.unshift(sess);
+  }
+
+  // Add user message
+  const userMsg = { role: 'user', content: question, ts: new Date().toISOString() };
+  sess.messages.push(userMsg);
+  saveToStorage();
+  renderMessages();
+
+  // Show loading
+  const container = document.getElementById('messages');
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'msg-row assistant';
+  loadingEl.innerHTML = `
+    <div class="msg-loading">
+      <div class="dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+      <span class="loading-label">Mencari dalil…</span>
+    </div>`;
+  container.appendChild(loadingEl);
+  container.scrollTop = container.scrollHeight;
+
+  // Disable input
+  document.getElementById('btn-send').disabled = true;
+
+  try {
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+    });
+
+    const data = await res.json();
+    loadingEl.remove();
+
+    const found = data.found !== false;
+    const content = found ? (data.answer || '') : (data.answer || 'Maaf, pertanyaan tidak cocok dengan topik dalam database. Silakan coba pertanyaan lain atau tanyakan langsung kepada ustaz.');
+
+    const assistantMsg = {
+      role: 'assistant',
+      content,
+      ts: new Date().toISOString(),
+      data: {
+        found,
+        quran:            data.quran || [],
+        hadis:            data.hadis || [],
+        ruling:           data.ruling || '',
+        madhab:           data.madhab || '',
+        reasoning:        data.reasoning || '',
+        confidence:       data.confidence || '',
+        confidence_score: data.confidence_score || 0,
+        disclaimer:       data.disclaimer || '',
+        warnings:         data.warnings || [],
+      },
+    };
+
+    sess.messages.push(assistantMsg);
+    saveToStorage();
+
+  } catch(e) {
+    loadingEl.remove();
+    const errMsg = {
+      role: 'assistant',
+      content: 'Terjadi kesalahan koneksi. Pastikan server aktif dan coba lagi.',
+      ts: new Date().toISOString(),
+      data: { found: false, quran: [], hadis: [], confidence: 'insufficient', confidence_score: 0 },
+    };
+    sess.messages.push(errMsg);
+    saveToStorage();
+  }
+
+  isLoading = false;
+  document.getElementById('btn-send').disabled = false;
+  renderMessages();
+  renderSidebarSessions();
+}
+
+/* ──────────────────────────────────────────────────────────────
+   ESCAPE HTML
+────────────────────────────────────────────────────────────── */
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   EVENT DELEGATION + INIT
+────────────────────────────────────────────────────────────── */
+function init() {
+  loadFromStorage();
+  if (sessions.length === 0) createNewSession();
+  else currentSessId = sessions[0].id;
+
+  renderTopics();
+  renderQuickTags();
+  renderSidebarSessions();
+  renderMessages();
+
+  // Input auto-resize
+  const textarea = document.getElementById('question-input');
+  textarea.addEventListener('input', () => autoResize(textarea));
+
+  // Send on Enter (Shift+Enter = newline)
+  textarea.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      doSend();
+    }
   });
-});
 
-// Auto-focus
-questionInput.focus();
+  // Send button
+  document.getElementById('btn-send').addEventListener('click', doSend);
+
+  // New chat
+  document.getElementById('btn-new-chat').addEventListener('click', () => {
+    createNewSession();
+    renderSidebarSessions();
+    renderMessages();
+    closeDalilPanel();
+    textarea.focus();
+  });
+
+  // Close dalil panel
+  document.getElementById('btn-close-panel').addEventListener('click', closeDalilPanel);
+
+  // Open history modal
+  document.getElementById('btn-open-history').addEventListener('click', openHistoryModal);
+  document.getElementById('btn-modal-close').addEventListener('click', closeHistoryModal);
+
+  // Close modal on overlay click
+  document.getElementById('history-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeHistoryModal();
+  });
+
+  // Clear all sessions
+  document.getElementById('btn-clear-all').addEventListener('click', () => {
+    if (!confirm('Hapus semua riwayat percakapan? Tindakan ini tidak dapat dibatalkan.')) return;
+    clearAllSessions();
+    renderSidebarSessions();
+    renderMessages();
+    renderHistoryModal();
+    showToast('🗑️ Semua riwayat telah dihapus.');
+    closeHistoryModal();
+  });
+
+  // Sidebar: session clicks & deletes (event delegation)
+  document.getElementById('session-list').addEventListener('click', e => {
+    const delBtn = e.target.closest('[data-del]');
+    if (delBtn) {
+      e.stopPropagation();
+      deleteSessionById(delBtn.dataset.del);
+      renderSidebarSessions();
+      renderMessages();
+      return;
+    }
+    const item = e.target.closest('[data-id]');
+    if (item) {
+      currentSessId = item.dataset.id;
+      renderSidebarSessions();
+      renderMessages();
+      closeDalilPanel();
+    }
+  });
+
+  // Topic chips (sidebar + empty state quick tags)
+  document.addEventListener('click', e => {
+    const chip = e.target.closest('[data-query]');
+    if (chip) {
+      const q = chip.dataset.query;
+      document.getElementById('question-input').value = q;
+      autoResize(document.getElementById('question-input'));
+      doSend();
+    }
+
+    // Dalil button
+    const dalilBtn = e.target.closest('.btn-dalil');
+    if (dalilBtn) {
+      const idx = parseInt(dalilBtn.dataset.msgIdx, 10);
+      showDalilPanel(idx);
+    }
+
+    // Copy
+    const copyBtn = e.target.closest('.btn-copy-ans');
+    if (copyBtn) copyAnswer(parseInt(copyBtn.dataset.msgIdx, 10));
+
+    // Share
+    const shareBtn = e.target.closest('.btn-share-ans');
+    if (shareBtn) shareAnswer(parseInt(shareBtn.dataset.msgIdx, 10));
+
+    // Modal: load session
+    const loadRow = e.target.closest('[data-load]');
+    if (loadRow && !e.target.closest('[data-del-modal]')) {
+      currentSessId = loadRow.dataset.load;
+      renderSidebarSessions();
+      renderMessages();
+      closeDalilPanel();
+      closeHistoryModal();
+    }
+
+    // Modal: delete session
+    const delModal = e.target.closest('[data-del-modal]');
+    if (delModal) {
+      e.stopPropagation();
+      deleteSessionById(delModal.dataset.delModal);
+      renderSidebarSessions();
+      renderHistoryModal();
+    }
+  });
+}
+
+function doSend() {
+  const ta = document.getElementById('question-input');
+  const q  = ta.value.trim();
+  if (!q || isLoading) return;
+  ta.value = '';
+  autoResize(ta);
+  sendQuestion(q);
+}
+
+// Boot
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>

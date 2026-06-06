@@ -12,6 +12,11 @@ Pipeline:
 
 Tidak ada class baru. Tidak ada abstraction baru.
 Hanya orchestration tipis di atas fungsi Phase 1.
+
+Changelog:
+  Phase 2.0 — Initial release
+  Phase 2.1 — Remove unused EvidenceReport import;
+               tambah docstring return type per-status
 """
 
 import logging
@@ -21,7 +26,7 @@ from datetime import datetime
 
 from query_parser import parse_user_query
 from retrieval import retrieve_ruling
-from reasoning_validator import gate_answer, EvidenceReport
+from reasoning_validator import gate_answer
 from formatter import format_answer
 
 logger = logging.getLogger(__name__)
@@ -33,10 +38,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ChatResponse:
-    """Response sukses dari pipeline."""
+    """Response sukses dari pipeline (status='ok')."""
     status: str                     # "ok"
     answer: str                     # formatted output dari format_answer()
-    topic: str                      # topic key yg ditemukan
+    topic: str                      # topic key yang ditemukan
     confidence_score: float         # 0.0 – 1.0
     confidence_label: str           # "high" | "medium" | "low" | "insufficient"
     warnings: list
@@ -53,10 +58,17 @@ class ChatResponse:
 
 @dataclass
 class ChatRejection:
-    """Response ketika pipeline menolak menjawab."""
-    status: str                     # "rejected" | "no_match"
-    reason: str                     # penjelasan ke user
-    topic: Optional[str]            # topic key jika ditemukan, else None
+    """
+    Response ketika pipeline tidak dapat / tidak mau menjawab.
+
+    status values:
+      "no_match"  — topic tidak ditemukan di shafii_rules (parse gagal)
+      "rejected"  — topic ditemukan tapi confidence terlalu rendah
+      "error"     — exception tidak terduga di pipeline
+    """
+    status: str
+    reason: str
+    topic: Optional[str]
     confidence_score: float
     confidence_label: str
     warnings: list
@@ -80,27 +92,22 @@ def chat(question: str) -> dict:
 
     ARGS:
         question (str): Pertanyaan dari user, teks bebas.
+                        Harus sudah melalui validate_question() di caller.
 
     RETURNS:
-        dict: ChatResponse.to_dict()  jika bisa dijawab
-              ChatRejection.to_dict() jika ditolak
+        ChatResponse.to_dict()  jika pipeline berhasil  → status="ok"
+        ChatRejection.to_dict() jika tidak cocok         → status="no_match"
+        ChatRejection.to_dict() jika confidence rendah   → status="rejected"
+        ChatRejection.to_dict() jika exception           → status="error"
 
-    FLOW:
-        1. parse_user_query()  → topic key
-        2. retrieve_ruling()   → retrieval_result dict
-        3. gate_answer()       → (can_answer, report, reason)
-        4. format_answer()     → formatted string
-
-    NEVER RAISES: semua exception ditangkap dan dikembalikan
-    sebagai ChatRejection dengan status "error".
+    NEVER RAISES: semua exception ditangkap di sini.
     """
-
-    logger.info(f"[chat] question='{question[:80]}'")
+    logger.info("[chat] question='%s'", question[:80])
 
     try:
         # ── STEP 1: Parse ────────────────────────────────────────────────────
         topic = parse_user_query(question)
-        logger.debug(f"[chat] topic resolved → {topic}")
+        logger.debug("[chat] topic resolved → %s", topic)
 
         # ── STEP 2: Retrieve ─────────────────────────────────────────────────
         retrieval_result = retrieve_ruling(topic) if topic else None
@@ -134,7 +141,7 @@ def chat(question: str) -> dict:
         ).to_dict()
 
     except Exception as exc:
-        logger.exception(f"[chat] unexpected error: {exc}")
+        logger.exception("[chat] unexpected error: %s", exc)
         return ChatRejection(
             status="error",
             reason="Terjadi kesalahan internal. Silakan coba lagi.",
@@ -151,14 +158,12 @@ def chat(question: str) -> dict:
 
 def is_answerable(question: str) -> bool:
     """True jika pertanyaan ini akan menghasilkan ChatResponse (status='ok')."""
-    result = chat(question)
-    return result.get("status") == "ok"
+    return chat(question).get("status") == "ok"
 
 
 def get_confidence(question: str) -> float:
     """Shortcut: kembalikan confidence_score saja (0.0 jika ditolak)."""
-    result = chat(question)
-    return result.get("confidence_score", 0.0)
+    return chat(question).get("confidence_score", 0.0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -181,7 +186,7 @@ if __name__ == "__main__":
         print(f"Q: {q}")
         result = chat(q)
         print(f"Status    : {result['status']}")
-        if result['status'] == 'ok':
+        if result["status"] == "ok":
             print(f"Topic     : {result['topic']}")
             print(f"Confidence: {result['confidence_score']} ({result['confidence_label']})")
             print(f"Answer    :\n{result['answer']}")

@@ -1,6 +1,10 @@
 # app.py
-# IslamiAI — Production Flask App (Phase 1)
+# IslamiAI — Production Flask App (Phase 1 + Phase 2)
 # Security hardening: flask-limiter + Redis, request ID tracing, Sentry.
+#
+# Changelog:
+#   Phase 1   — /api/ask, /api/health, rate limiter, Sentry, security headers
+#   Phase 2   — /chat (chatbot.py), /status (debug endpoint)
 
 import logging
 import os
@@ -17,9 +21,10 @@ from retrieval import retrieve_ruling
 from formatter import format_answer
 from reasoning_validator import gate_answer
 
+# ── Phase 2: Chatbot orchestration ───────────────────────────────────────────
+from chatbot import chat as chatbot_chat
+
 # ── Sentry (error monitoring) ─────────────────────────────────────────────────
-# Aktif hanya jika SENTRY_DSN diset di environment.
-# Tidak perlu install sentry-sdk jika belum diperlukan — gagal gracefully.
 _sentry_enabled = False
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 if SENTRY_DSN:
@@ -29,19 +34,16 @@ if SENTRY_DSN:
         sentry_sdk.init(
             dsn=SENTRY_DSN,
             integrations=[FlaskIntegration()],
-            # Jangan kirim data request body ke Sentry (privacy)
             send_default_pii=False,
-            # Sample 100% errors, 10% performance traces
             traces_sample_rate=0.10,
         )
         _sentry_enabled = True
     except ImportError:
-        pass  # sentry-sdk belum diinstall — tidak crash
+        pass
 
 # ── Logging Setup ─────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL),
-    # Format diperluas dengan request_id untuk tracing
     format="%(asctime)s [%(levelname)s] %(name)s [%(request_id)s]: %(message)s",
     handlers=[
         logging.StreamHandler(),
@@ -50,9 +52,7 @@ logging.basicConfig(
 )
 
 class RequestIdFilter(logging.Filter):
-    """Inject request_id ke setiap log record dalam konteks request."""
     def filter(self, record):
-        # g tidak tersedia di luar request context (startup logs)
         try:
             from flask import g as flask_g
             record.request_id = getattr(flask_g, "request_id", "-")
@@ -62,53 +62,33 @@ class RequestIdFilter(logging.Filter):
 
 _request_id_filter = RequestIdFilter()
 logging.getLogger().addFilter(_request_id_filter)
-
-# ── TAMBAHKAN INI ───────────────────────────────────────────
-# Filter pada logger hanya berlaku untuk record dari logger itu sendiri.
-# Werkzeug/Flask propagate ke root handlers langsung, bypass filter logger.
-# Solusi: pasang filter juga ke setiap handler.
 for _handler in logging.getLogger().handlers:
     _handler.addFilter(_request_id_filter)
-# ────────────────────────────────────────────────────────────
 
 logger = logging.getLogger("islamiai")
 
 # ── Flask App ──────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
-app.config["SESSION_COOKIE_SECURE"]  = config.SESSION_COOKIE_SECURE
+app.config["SESSION_COOKIE_SECURE"]   = config.SESSION_COOKIE_SECURE
 app.config["SESSION_COOKIE_HTTPONLY"] = config.SESSION_COOKIE_HTTPONLY
 app.config["SESSION_COOKIE_SAMESITE"] = config.SESSION_COOKIE_SAMESITE
 
-# ── Rate Limiter (flask-limiter + Redis) ───────────────────────────────────────
-# storage_uri:
-#   - Jika REDIS_URL diset (production/staging): gunakan Redis → persist restart,
-#     akurat di multi-worker Gunicorn.
-#   - Fallback "memory://" jika tidak diset (dev lokal): sama seperti Phase 0.
-#
-# Key function: IP address dari request.
-# Default limit: 30 req/menit (sesuai config.RATE_LIMIT_PER_MINUTE).
-# Burst allowance (RATE_LIMIT_BURST) diimplementasi via dua limit tier.
-
+# ── Rate Limiter ───────────────────────────────────────────────────────────────
 _redis_url = os.getenv("REDIS_URL", "memory://")
 
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
     storage_uri=_redis_url,
-    default_limits=[],          # Tidak ada default global — dikontrol per-route
-    strategy="fixed-window",    # Konsisten, predictable, cocok untuk API publik
-    headers_enabled=True,       # Kirim X-RateLimit-* headers ke client
+    default_limits=[],
+    strategy="fixed-window",
+    headers_enabled=True,
 )
 
 # ── Request ID Middleware ──────────────────────────────────────────────────────
 @app.before_request
 def assign_request_id():
-    """
-    Generate UUID unik per request dan simpan di g.request_id.
-    Dipakai untuk: log tracing, Sentry breadcrumbs, X-Request-ID header.
-    Format: 8 karakter hex pendek (cukup untuk tracing dalam satu session).
-    """
     g.request_id = uuid.uuid4().hex[:8]
     g.start_time = time.time()
 
@@ -129,7 +109,6 @@ def add_security_headers(response):
         response.headers["Strict-Transport-Security"] = (
             "max-age=31536000; includeSubDomains"
         )
-    # Propagate request ID ke response header untuk client-side debugging
     if hasattr(g, "request_id"):
         response.headers["X-Request-ID"] = g.request_id
     return response
@@ -158,23 +137,31 @@ def ratelimit_handler(e):
         "code": "RATE_LIMITED",
     }), 429
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ROUTES
+# ══════════════════════════════════════════════════════════════════════════════
+
 @app.route("/")
 def home():
     return render_template("index.html")
 
 
+# ── /api/ask  (Phase 1 — backward compatible, respons kaya) ──────────────────
 @app.route("/api/ask", methods=["POST"])
 @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE} per minute")
 def ask_question():
-    # Parse request body
+    """
+    Endpoint Phase 1. Tetap dipertahankan untuk backward compatibility.
+    Mengembalikan respons lengkap (ruling, madhab, quran refs, hadis refs).
+    Gunakan /chat untuk integrasi chatbot UI yang lebih sederhana.
+    """
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Request body harus berupa JSON.", "code": "BAD_REQUEST"}), 400
 
     raw_question = data.get("question", "")
 
-    # Input validation
     try:
         question = validate_question(raw_question)
     except InputValidationError as e:
@@ -183,7 +170,6 @@ def ask_question():
 
     logger.info("Query: ip=%s question='%s'", request.remote_addr, question[:60])
 
-    # Pipeline: parse → retrieve → gate → format
     topic             = parse_user_query(question)
     retrieval_result  = retrieve_ruling(topic) if topic else None
     can_answer, evidence_report, block_reason = gate_answer(retrieval_result)
@@ -216,13 +202,61 @@ def ask_question():
         },
         "warnings":    evidence_report.warnings,
         "disclaimer":  evidence_report.disclaimer,
-        "request_id":  g.request_id,   # memudahkan tracing di client
+        "request_id":  g.request_id,
     })
 
 
+# ── /chat  (Phase 2 — chatbot.py, respons terstruktur) ───────────────────────
+@app.route("/chat", methods=["POST"])
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE} per minute")
+def chat_endpoint():
+    """
+    Endpoint Phase 2. Menggunakan chatbot.py sebagai orchestration layer.
+
+    Menerima:
+        { "question": "..." }   atau   { "message": "..." }
+
+    Mengembalikan ChatResponse / ChatRejection dict dengan field:
+        status, answer/reason, topic, confidence_score,
+        confidence_label, warnings, disclaimer, timestamp, request_id
+
+    HTTP Status:
+        200  — selalu (status chatbot ada di body: ok/no_match/rejected)
+        400  — body bukan JSON
+        422  — validasi input gagal
+        429  — rate limited
+        500  — error tidak terduga di luar pipeline chatbot
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Request body harus berupa JSON.", "code": "BAD_REQUEST"}), 400
+
+    # Terima "question" atau "message" untuk fleksibilitas integrasi frontend
+    raw_question = data.get("question", data.get("message", ""))
+
+    try:
+        question = validate_question(raw_question)
+    except InputValidationError as e:
+        logger.info("Chat validation failed: ip=%s error='%s'", request.remote_addr, e)
+        return jsonify({"error": str(e), "code": "VALIDATION_ERROR"}), 422
+
+    logger.info("Chat: ip=%s question='%s'", request.remote_addr, question[:60])
+
+    # Seluruh pipeline (parse → retrieve → gate → format) ada di chatbot_chat()
+    result = chatbot_chat(question)
+
+    # Inject request_id untuk client-side tracing
+    result["request_id"] = g.request_id
+
+    # Error dalam pipeline dikembalikan sebagai 200 dengan status="error" di body,
+    # kecuali jika chatbot_chat() sendiri raise (seharusnya tidak terjadi).
+    return jsonify(result)
+
+
+# ── /api/health  (Phase 1 — cloud uptime monitoring) ─────────────────────────
 @app.route("/api/health")
 def health():
-    """Cloud health check + uptime monitoring endpoint."""
+    """Cloud health check endpoint. Tidak di-rate-limit."""
     from islamic_data import quran_verses, hadis_collection, shafii_rules
     return jsonify({
         "status": "ok",
@@ -231,9 +265,82 @@ def health():
             "hadis":        len(hadis_collection),
             "rules":        len(shafii_rules),
         },
-        "sentry": _sentry_enabled,
+        "sentry":               _sentry_enabled,
         "rate_limiter_backend": "redis" if "redis" in _redis_url else "memory",
     })
+
+
+# ── /status  (Phase 2 — chatbot pipeline status) ─────────────────────────────
+@app.route("/status")
+def status():
+    """
+    Debug endpoint Phase 2: verifikasi semua komponen pipeline siap.
+    Berguna saat deployment untuk konfirmasi sistem berjalan end-to-end.
+    Tidak di-rate-limit — akses internal/monitoring saja.
+    """
+    components = {}
+
+    # Cek islamic_data
+    try:
+        from islamic_data import quran_verses, hadis_collection, shafii_rules
+        components["islamic_data"] = {
+            "status": "ready",
+            "quran_verses": len(quran_verses),
+            "hadis": len(hadis_collection),
+            "rules": len(shafii_rules),
+        }
+    except Exception as e:
+        components["islamic_data"] = {"status": "error", "detail": str(e)}
+
+    # Cek query_parser
+    try:
+        from query_parser import parse_user_query
+        test_result = parse_user_query("syahadat")
+        components["query_parser"] = {
+            "status": "ready",
+            "test_parse": test_result or "no_match",
+        }
+    except Exception as e:
+        components["query_parser"] = {"status": "error", "detail": str(e)}
+
+    # Cek retrieval
+    try:
+        from retrieval import retrieve_ruling
+        components["retrieval"] = {"status": "ready"}
+    except Exception as e:
+        components["retrieval"] = {"status": "error", "detail": str(e)}
+
+    # Cek reasoning_validator
+    try:
+        from reasoning_validator import gate_answer
+        components["reasoning_validator"] = {"status": "ready"}
+    except Exception as e:
+        components["reasoning_validator"] = {"status": "error", "detail": str(e)}
+
+    # Cek formatter
+    try:
+        from formatter import format_answer
+        components["response_formatter"] = {"status": "ready"}
+    except Exception as e:
+        components["response_formatter"] = {"status": "error", "detail": str(e)}
+
+    # Cek chatbot
+    try:
+        from chatbot import chat
+        components["chatbot"] = {"status": "ready"}
+    except Exception as e:
+        components["chatbot"] = {"status": "error", "detail": str(e)}
+
+    # Overall status
+    all_ready = all(c.get("status") == "ready" for c in components.values())
+    overall   = "healthy" if all_ready else "degraded"
+
+    return jsonify({
+        "chatbot_status": overall,
+        **{k: v["status"] for k, v in components.items()},
+        "components": components,
+        "request_id": g.request_id,
+    }), 200 if all_ready else 503
 
 
 # ── Error handlers ────────────────────────────────────────────────────────────
