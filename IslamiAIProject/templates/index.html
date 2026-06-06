@@ -1169,15 +1169,54 @@
     .hidden { display: none !important; }
 
     /* Mobile collapse */
+    .mob-menu-btn, .mob-dalil-btn {
+      display: none;
+      background: var(--sage-50);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      width: 36px; height: 36px;
+      cursor: pointer; font-size: 17px;
+      align-items: center; justify-content: center;
+      color: var(--text-secondary);
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .mob-menu-btn:hover, .mob-dalil-btn:hover { background: var(--sage-100); }
+
+    .mob-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(26,44,28,0.52); z-index: 40;
+      backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    }
+    .mob-backdrop.show { display: block; }
+
     @media (max-width: 900px) {
-      .app {
-        grid-template-columns: 1fr;
-        height: 100vh;
-        height: 100dvh;
-        grid-template-rows: 100vh;
-        grid-template-rows: 100dvh;
+      .app { grid-template-columns: 1fr; height: 100dvh; overflow: hidden; }
+      .mob-menu-btn, .mob-dalil-btn { display: flex; }
+
+      .sidebar {
+        display: flex !important; position: fixed;
+        left: -285px; top: 0; bottom: 0; width: 285px !important;
+        z-index: 50; transition: left 0.32s var(--ease-out);
       }
-      .sidebar, .dalil-panel { display: none !important; }
+      .sidebar.mob-open { left: 0; box-shadow: var(--shadow-lg); }
+
+      .dalil-panel {
+        display: flex !important; position: fixed !important;
+        bottom: -100% !important; left: 0; right: 0;
+        width: 100% !important; height: 80vh; z-index: 50;
+        border-radius: 20px 20px 0 0;
+        transition: bottom 0.35s var(--ease-out) !important;
+      }
+      .dalil-panel.mob-open { bottom: 0 !important; box-shadow: var(--shadow-lg); }
+      .dalil-panel.collapsed { bottom: -100% !important; opacity: 1 !important; }
+
+      .chat-area { border-right: none; }
+
+      .chat-header { padding: 12px 16px; }
+      .input-area  { padding: 12px 16px 16px; }
+      .messages    { padding: 16px; }
+    }      .sidebar, .dalil-panel { display: none !important; }
       .chat-area { border-right: none; }
     }
   </style>
@@ -1229,11 +1268,15 @@
   <!-- ── CENTER: MAIN CHAT ─────────────────────────────────────── -->
   <main class="chat-area">
     <div class="chat-header">
+      <button class="mob-menu-btn" id="btn-mob-sidebar">&#9776;</button>
       <div>
         <div class="chat-title">Tanya <span>Ilmu Islam</span></div>
         <div class="chat-subtitle">Fikih Syafi'i · Dalil Quran & Hadis Shahih</div>
       </div>
-      <div class="header-badge">Online</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="mob-dalil-btn" id="btn-mob-dalil" title="Panel Dalil">&#128218;</button>
+        <div class="header-badge">Online</div>
+      </div>
     </div>
 
     <div class="messages" id="messages">
@@ -1640,6 +1683,7 @@ function showDalilPanel(msgIdx) {
   panelFooter.style.display = madhab ? '' : 'none';
 
   panel.classList.remove('collapsed');
+  if (isMobile()) { panel.classList.add('mob-open'); document.getElementById('mob-backdrop').classList.add('show'); }
 }
 
 function toggleDalil(id) {
@@ -1858,7 +1902,14 @@ function init() {
   });
 
   // Close dalil panel
-  document.getElementById('btn-close-panel').addEventListener('click', closeDalilPanel);
+  document.getElementById('btn-close-panel').addEventListener('click', function() {
+    closeDalilPanel(); if (isMobile()) closeMobDrawers();
+  });
+  var bms = document.getElementById('btn-mob-sidebar');
+  if (bms) bms.addEventListener('click', openMobSidebar);
+  var bmd = document.getElementById('btn-mob-dalil');
+  if (bmd) bmd.addEventListener('click', openMobDalil);
+  document.getElementById('mob-backdrop').addEventListener('click', closeMobDrawers);
 
   // Open history modal
   document.getElementById('btn-open-history').addEventListener('click', openHistoryModal);
