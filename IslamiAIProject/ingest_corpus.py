@@ -386,14 +386,50 @@ def _extract_text_from_item(item) -> str:
         return ""
 
 
-def _get_chapter_title(item) -> str:
-    """
-    Dapatkan referensi halaman dari nama file item.
-    shamela2epub: "pages/page_001.xhtml" atau "OEBPS/Text/page_001.xhtml"
-    """
+def _get_page_ref(item) -> str:
+    """Dapatkan referensi halaman dari nama file item (page anchor)."""
     item_name = item.get_name()
     basename  = os.path.basename(item_name)
     return os.path.splitext(basename)[0]   # e.g. "page_001"
+
+
+def _get_chapter_title(item) -> str:
+    """
+    Ekstrak judul bab Arab dari heading pertama yang valid dalam EPUB item.
+
+    Phase B2 — Perbaikan dari Phase A:
+    Sebelumnya: mengembalikan nama file item (e.g. "page_001") yang merupakan
+    page anchor shamela2epub, bukan judul bab bermakna.
+
+    Sekarang: parse HTML item, cari heading (h1–h4) yang mengandung ≥4
+    karakter Arab dan bukan merupakan page anchor (pola "page_NNN").
+    Jika tidak ada heading Arab yang valid → kembalikan string kosong
+    (lebih baik kosong daripada page anchor yang misleading).
+
+    Args:
+        item: ebooklib EPUB document item
+
+    Returns:
+        Judul bab Arab (max 200 karakter), atau "" jika tidak ditemukan.
+    """
+    try:
+        content = item.get_content()
+        soup    = BeautifulSoup(content, "lxml")
+        for tag in soup.find_all(["h1", "h2", "h3", "h4"]):
+            text = tag.get_text(strip=True)
+            # Skip page anchors: "page_001", "page_1_0265", dll.
+            if re.match(r"^page_\d", text):
+                continue
+            # Hitung karakter Arab (U+0600–U+06FF + Arabic supplement ranges)
+            arabic_count = sum(1 for c in text if _is_arabic_char(c))
+            if arabic_count >= 4:
+                return text[:200]
+    except Exception as e:
+        logger.debug(
+            "Gagal extract chapter_title dari %s: %s",
+            getattr(item, "get_name", lambda: "?")(), e,
+        )
+    return ""   # Tidak ada judul bab ditemukan
 
 
 def parse_epub(epub_path: str, limit: int = 0) -> Generator[dict, None, None]:
@@ -429,10 +465,11 @@ def parse_epub(epub_path: str, limit: int = 0) -> Generator[dict, None, None]:
                          len(text), os.path.basename(epub_path))
 
         chapter_title = _get_chapter_title(item)
+        page_ref      = _get_page_ref(item)
         yield {
             "arabic_text":   text,
             "chapter_title": chapter_title,
-            "page_ref":      chapter_title,   # Untuk shamela2epub ini sama
+            "page_ref":      page_ref,
             "text_length":   len(text),
         }
         count += 1

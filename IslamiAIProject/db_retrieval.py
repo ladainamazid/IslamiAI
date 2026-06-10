@@ -109,6 +109,101 @@ ARABIC_TOPIC_MAP: dict[str, str] = {
 }
 
 
+# ─── Domain-Aware Re-ranking (Phase B1) ──────────────────────────────────────
+#
+# Setiap domain fiqh punya kosakata Arab berbeda dan hierarki otoritas yang
+# berbeda (e.g. tahara butuh kitab Nawawi level 3, muamalat bisa level 4-5).
+# Domain profiles dipakai untuk:
+#   1. Memperluas query FTS5 dengan kosakata domain-specific
+#   2. Men-boost authority level yang relevan saat re-ranking
+
+DOMAIN_QUERY_PROFILES: dict[str, dict] = {
+    "tahara": {
+        "arabic_terms": ["الطهارة", "الوضوء", "الغسل", "التيمم",
+                         "الحدث", "النجاسة", "النية", "الاستنجاء"],
+        "authority_preference": [1, 2, 3],
+        "topic_keywords": ["wudhu", "wudu", "ghusl", "mandi", "tayammum",
+                           "tahara", "najis", "hadats", "hadas", "junub",
+                           "istinja", "bersuci", "thaharah"],
+    },
+    "salat": {
+        "arabic_terms": ["الصلاة", "الأذان", "الإقامة", "القبلة",
+                         "الركعة", "السجود", "الركوع", "الإمام",
+                         "الجماعة", "الفاتحة", "التشهد", "القنوت"],
+        "authority_preference": [1, 2, 3],
+        "topic_keywords": ["shalat", "salat", "solat", "sholat", "sujud", "ruku",
+                           "qiblat", "kiblat", "adzan", "azan", "iqamah",
+                           "jamaah", "tahajud", "dhuha"],
+    },
+    "zakat": {
+        "arabic_terms": ["الزكاة", "الصدقة", "النصاب", "الحول",
+                         "زكاة الفطر", "المصارف", "الأصناف"],
+        "authority_preference": [1, 2, 3],
+        "topic_keywords": ["zakat", "infaq", "sedekah", "shadaqah",
+                           "nisab", "haul", "fitrah", "fitri", "mustahiq"],
+    },
+    "sawm": {
+        "arabic_terms": ["الصيام", "الصوم", "رمضان", "الإفطار",
+                         "الكفارة", "السحور", "الاعتكاف"],
+        "authority_preference": [1, 2, 3],
+        "topic_keywords": ["puasa", "sawm", "shaum", "ramadhan", "iftar",
+                           "sahur", "itikaf", "kafarat"],
+    },
+    "hajj": {
+        "arabic_terms": ["الحج", "العمرة", "الإحرام", "الطواف",
+                         "السعي", "الوقوف", "المناسك", "الميقات"],
+        "authority_preference": [1, 2, 3],
+        "topic_keywords": ["haji", "umrah", "ihram", "tawaf",
+                            "sai", "wukuf", "manasik", "miqat"],
+    },
+    "munakahah": {
+        "arabic_terms": ["النكاح", "الطلاق", "الزواج", "المهر",
+                         "العدة", "الخلع", "الرجعة", "الولي"],
+        "authority_preference": [3, 4],
+        "topic_keywords": ["nikah", "pernikahan", "kawin", "talak", "cerai",
+                           "mahar", "iddah", "khuluk", "wali"],
+    },
+    "muamalat": {
+        "arabic_terms": ["البيع", "الإجارة", "الرهن", "القرض",
+                         "الشركة", "الوكالة", "الغصب", "الضمان"],
+        "authority_preference": [3, 4],
+        "topic_keywords": ["jual beli", "muamalat", "sewa", "gadai",
+                           "pinjam", "riba", "utang", "kontrak"],
+    },
+    "aqidah": {
+        "arabic_terms": ["التوحيد", "الإيمان", "الكفر", "الشرك",
+                         "العقيدة", "أسماء الله", "الصفات"],
+        "authority_preference": [1, 5],
+        "topic_keywords": ["aqidah", "akidah", "iman", "tauhid", "kufur",
+                           "syirik", "aqeedah"],
+    },
+    "tafsir": {
+        "arabic_terms": ["التفسير", "الآية", "السورة", "القرآن",
+                         "الأحكام", "التأويل"],
+        "authority_preference": [5],
+        "topic_keywords": ["tafsir", "ayat", "surah", "quran", "qur'an",
+                           "penafsiran"],
+    },
+    "general": {
+        "arabic_terms": [],   # Tidak ada expansion tambahan
+        "authority_preference": [1, 2, 3, 4, 5],
+        "topic_keywords": [],
+    },
+}
+
+# Authority level → base score [0.0–1.0], lebih tinggi = lebih otoritatif
+_AUTHORITY_SCORE: dict[int, float] = {
+    1: 1.00,   # Qawl Imam (Imam Al-Syafi'i)
+    2: 0.85,   # Qawl Ashhab (Muzani)
+    3: 0.70,   # Mu'tamad (Nawawi, Mawardi, Juwayni)
+    4: 0.55,   # Syarh Mu'tamad (Tuhfat, Nihayat, Mughni, Fath al-Mu'in)
+    5: 0.40,   # Tafsir Ahkam & Qawa'id Fiqhiyyah
+}
+
+# Bonus score untuk level yang ada di authority_preference domain
+_DOMAIN_PREFERENCE_BOOST: float = 0.15
+
+
 # ─── Query Utilities ──────────────────────────────────────────────────────────
 
 def _is_arabic(text: str) -> bool:
@@ -125,22 +220,26 @@ def _sanitize_fts_term(term: str) -> str:
     return term
 
 
-def _expand_arabic_query(raw_query: str) -> str:
+def _expand_arabic_query(raw_query: str, domain: str = "general") -> str:
     """
     Expand query Arab untuk menangani artikel definitif (ال-).
+
+    Phase B1: tambah domain parameter untuk menyertakan kosakata domain-specific
+    sebagai OR alternatives. Backward compatible: panggil tanpa domain untuk
+    perilaku Phase A (hanya artikel-definitif expansion).
 
     Masalah: FTS5 unicode61 remove_diacritics TIDAK memisahkan ال-.
     Sehingga query 'وضوء' (tanpa ال) TIDAK mencocokkan 'الوضوء' dalam teks.
 
-    Solusi: setiap term yang tidak diawali ال dijadikan OR dengan variant ال-:
-        'وضوء'  → '(وضوء OR الوضوء)'
-        'الوضوء' → 'الوضوء'  (biarkan)
+    Solusi: setiap term yang tidak diawali ال dijadikan OR dengan variant ال-,
+    ditambah kosakata domain jika domain diberikan.
 
     Args:
         raw_query: Query string, bisa multi-term dipisah spasi
+        domain:    Domain fiqh (dari DOMAIN_QUERY_PROFILES); default 'general'
 
     Returns:
-        FTS5 query string yang sudah di-expand
+        FTS5 query string yang sudah di-expand, atau "" jika kosong
     """
     terms = raw_query.strip().split()
     if not terms:
@@ -151,24 +250,147 @@ def _expand_arabic_query(raw_query: str) -> str:
         if not term:
             continue
         term_clean = _sanitize_fts_term(term)
-        # Cek apakah sudah berawalan ال
         if term.startswith("ال"):
             expanded.append(term_clean)
         else:
             al_form = _sanitize_fts_term("ال" + term)
             expanded.append(f"({term_clean} OR {al_form})")
 
-    return " ".join(expanded)
+    # Domain expansion: tambah kosakata domain sebagai OR alternatives
+    domain_profile = DOMAIN_QUERY_PROFILES.get(domain, DOMAIN_QUERY_PROFILES["general"])
+    domain_terms: list[str] = domain_profile.get("arabic_terms", [])
+
+    # Kumpulkan semua term, deduplikasi
+    seen: set[str] = set()
+    all_terms: list[str] = []
+    for t in expanded:
+        if t and t not in seen:
+            seen.add(t)
+            all_terms.append(t)
+    for raw_t in domain_terms:
+        t = _sanitize_fts_term(raw_t)
+        if t and t not in seen:
+            seen.add(t)
+            all_terms.append(t)
+
+    return " OR ".join(all_terms)
 
 
-def _build_fts_query(topic: str) -> str:
+def _detect_domain(query: str) -> str:
+    """
+    Deteksi domain fiqh dari query (Indonesia/Arab/transliterasi).
+
+    Cek setiap domain_profile.topic_keywords terhadap query.
+    Mengembalikan domain string pertama yang cocok, atau 'general'.
+
+    Args:
+        query: Query string (bisa Arab, Indonesia, atau kunci ARABIC_TOPIC_MAP)
+
+    Returns:
+        Domain string: 'tahara' | 'salat' | 'zakat' | 'sawm' | 'munakahah' |
+                       'muamalat' | 'aqidah' | 'tafsir' | 'general'
+    """
+    q_lower = query.lower().strip()
+
+    # Cek exact/partial match dengan kunci ARABIC_TOPIC_MAP terlebih dahulu
+    # karena kunci ARABIC_TOPIC_MAP sudah punya granularitas tinggi
+    _TOPIC_TO_DOMAIN: dict[str, str] = {
+        "thaharah": "tahara", "wudhu": "tahara", "najis": "tahara",
+        "mandi": "tahara", "tayammum": "tahara",
+        "shalat": "salat", "solat": "salat",
+        "zakat": "zakat",
+        "puasa": "sawm", "ramadhan": "sawm",
+        "pernikahan": "munakahah", "nikah": "munakahah", "talak": "munakahah",
+        "muamalat": "muamalat", "jual_beli": "muamalat",
+        "aqidah": "aqidah", "tauhid": "aqidah",
+        "tafsir": "tafsir",
+    }
+    for key, dom in _TOPIC_TO_DOMAIN.items():
+        if key in q_lower:
+            return dom
+
+    # Fallback: scan topic_keywords tiap domain
+    for domain, profile in DOMAIN_QUERY_PROFILES.items():
+        if domain == "general":
+            continue
+        for kw in profile.get("topic_keywords", []):
+            if kw in q_lower:
+                return domain
+
+    return "general"
+
+
+def _rerank_by_authority(
+    hits: list[dict],
+    domain: str = "general",
+    alpha: float = 0.55,
+) -> list[dict]:
+    """
+    Re-rank FTS5 hits menggabungkan text relevance (BM25) + authority weight.
+
+    Setelah FTS5 mengembalikan candidates, fungsi ini melakukan post-retrieval
+    re-ranking agar kitab otoritatif (level 1-2) diprioritaskan bahkan jika
+    BM25 score-nya sedikit lebih rendah dari kitab level 4-5.
+
+    Args:
+        hits   : list of dicts, masing-masing HARUS punya:
+                   'rank' atau 'fts_rank' (float, negatif, lebih negatif = lebih relevan)
+                   'authority_level' (int 1-5)
+        domain : fiqh domain — menentukan level mana yang mendapat boost
+        alpha  : bobot text relevance [0,1]; (1-alpha) = bobot authority
+
+    Formula:
+        text_score  = (max_r - rank) / range     # best BM25 → 1.0
+        auth_score  = _AUTHORITY_SCORE[level] + boost_if_preferred  (capped 1.0)
+        combined    = alpha * text_score + (1-alpha) * auth_score
+
+    Mutates hits in-place (tambah key 'combined_score'),
+    return copy yang sudah di-sort descending by combined_score.
+    """
+    if not hits:
+        return hits
+
+    preferred_levels: set[int] = set(
+        DOMAIN_QUERY_PROFILES.get(domain, DOMAIN_QUERY_PROFILES["general"])
+        ["authority_preference"]
+    )
+
+    # Ambil nilai rank — support kedua key name untuk backward compat
+    def _get_rank(h: dict) -> float:
+        return h.get("rank", h.get("fts_rank", 0.0))
+
+    ranks = [_get_rank(h) for h in hits]
+    min_r = min(ranks)
+    max_r = max(ranks)
+    rank_range = (max_r - min_r) if abs(max_r - min_r) > 1e-9 else 1.0
+
+    for h in hits:
+        text_score = (max_r - _get_rank(h)) / rank_range  # 1.0 = best match
+
+        level = h.get("authority_level", 5)
+        auth_score = _AUTHORITY_SCORE.get(level, 0.40)
+        if level in preferred_levels:
+            auth_score = min(1.0, auth_score + _DOMAIN_PREFERENCE_BOOST)
+
+        h["combined_score"] = round(
+            alpha * text_score + (1.0 - alpha) * auth_score, 4
+        )
+
+    return sorted(hits, key=lambda x: x["combined_score"], reverse=True)
+
+
+
+
+def _build_fts_query(topic: str, domain: str = "general") -> str:
     """
     Bangun FTS5 query dari topic key atau query Arab langsung.
+
+    Phase B1: tambah domain parameter untuk meneruskan ke _expand_arabic_query.
 
     Priority:
     1. Topic key di ARABIC_TOPIC_MAP → gunakan kata kunci Arab
     2. Sudah mengandung Arab → expand langsung
-    3. Bahasa Indonesia tidak di map → gunakan sebagai-is (akan mencari di book_slug/name_id)
+    3. Bahasa Indonesia tidak di map → gunakan sebagai-is
 
     Returns:
         FTS5 query string, atau "" jika tidak bisa dibangun
@@ -178,18 +400,18 @@ def _build_fts_query(topic: str) -> str:
     # Cek exact match di ARABIC_TOPIC_MAP
     if topic_lower in ARABIC_TOPIC_MAP:
         arabic_terms = ARABIC_TOPIC_MAP[topic_lower]
-        return _expand_arabic_query(arabic_terms)
+        return _expand_arabic_query(arabic_terms, domain)
 
-    # Cek partial match (e.g. "wudhu" → "thaharah_wudhu")
+    # Cek partial match
     for key, arabic_terms in ARABIC_TOPIC_MAP.items():
         if topic_lower in key or key in topic_lower:
-            return _expand_arabic_query(arabic_terms)
+            return _expand_arabic_query(arabic_terms, domain)
 
     # Query sudah dalam Arab: expand langsung
     if _is_arabic(topic):
-        return _expand_arabic_query(topic)
+        return _expand_arabic_query(topic, domain)
 
-    # Fallback: gunakan as-is (akan mencocokkan book_slug, name_id, chapter_title)
+    # Fallback: gunakan as-is
     return _sanitize_fts_term(topic_lower)
 
 
@@ -243,33 +465,45 @@ def search_kitab(
     category:      Optional[str] = None,
     max_authority: int           = 5,
     min_authority: int           = 1,
+    alpha:         float         = 0.55,
     db_path:       str           = _DB_PATH,
 ) -> list[dict]:
     """
-    Cari teks di kitab corpus via FTS5.
+    Cari teks di kitab corpus via FTS5 + authority re-ranking (Phase B1).
+
+    Phase B1 changes vs Phase A:
+      - _detect_domain() sebelum query expansion
+      - _build_fts_query() dengan domain parameter
+      - Fetch limit × 4 candidates untuk re-ranking pool
+      - _rerank_by_authority() → return top limit setelah re-ranking
 
     Args:
         query:         Topik (Indonesian/transliterasi) ATAU kata kunci Arab.
-                       Contoh: "wudhu", "thaharah_wudhu", "الوضوء"
         limit:         Maksimal hasil yang dikembalikan (default: 5)
         category:      Filter kategori: "fiqh_syafii" | "tafsir_ahkam" |
                        "qawaid" | None (semua)
-        max_authority: Filter authority_level ≤ nilai ini (default: 5 = semua)
-        min_authority: Filter authority_level ≥ nilai ini (default: 1 = semua)
+        max_authority: Filter authority_level ≤ nilai ini (default: 5)
+        min_authority: Filter authority_level ≥ nilai ini (default: 1)
+        alpha:         Bobot text relevance vs authority (default 0.55)
         db_path:       Path ke file islamiai.db
 
     Returns:
         list[dict] dengan keys:
             id, book_slug, book_name_id, author, category, authority_level,
-            chapter_title, arabic_text, page_ref, rank
+            chapter_title, arabic_text, page_ref, rank, combined_score
         Mengembalikan [] jika DB tidak ada, query kosong, atau tidak ada hasil.
 
-    Tidak pernah raise exception.
+    Interface publik backward compatible:
+        search_kitab(query, limit=5) → list[dict]  (sama dengan Phase A)
     """
+    CANDIDATE_MULTIPLIER = 4
+
     if not query or not query.strip():
         return []
 
-    fts_query = _build_fts_query(query)
+    # Deteksi domain untuk expansion dan re-ranking
+    domain    = _detect_domain(query)
+    fts_query = _build_fts_query(query, domain)
     if not fts_query:
         return []
 
@@ -278,12 +512,10 @@ def search_kitab(
         return []
 
     try:
-        # Bangun WHERE clause dengan filter opsional
         where_parts  = ["kitab_fts MATCH ?"]
         params: list = [fts_query]
 
         if category:
-            where_parts.append("c.authority_level IS NOT NULL")  # always true, for join
             where_parts.append("c.category = ?")
             params.append(category)
         if min_authority > 1:
@@ -293,7 +525,8 @@ def search_kitab(
             where_parts.append("c.authority_level <= ?")
             params.append(max_authority)
 
-        params.append(limit)
+        candidate_limit = limit * CANDIDATE_MULTIPLIER
+        params.append(candidate_limit)
 
         sql = f"""
             SELECT
@@ -316,16 +549,22 @@ def search_kitab(
             JOIN kitab_books  b ON b.slug = c.book_slug
             WHERE {' AND '.join(where_parts[1:] if len(where_parts) > 1 else ['1=1'])}
             ORDER BY
-                c.authority_level ASC,  -- otoritas lebih tinggi (level 1) lebih diprioritaskan
-                fts_result.rank ASC     -- BM25: lebih negatif = lebih relevan
+                c.authority_level ASC,
+                fts_result.rank ASC
             LIMIT ?
         """
 
-        rows    = conn.execute(sql, params).fetchall()
-        results = [dict(row) for row in rows]
+        rows       = conn.execute(sql, params).fetchall()
+        candidates = [dict(row) for row in rows]
 
-        logger.info("search_kitab('%s') → %d hasil (query FTS: '%s')",
-                    query[:50], len(results), fts_query[:80])
+        # Re-rank: authority-weighted post-processing
+        results = _rerank_by_authority(candidates, domain=domain, alpha=alpha)
+        results = results[:limit]
+
+        logger.info(
+            "search_kitab('%s') domain=%s → %d/%d (query: '%s…')",
+            query[:40], domain, len(results), len(candidates), fts_query[:60]
+        )
         return results
 
     except sqlite3.OperationalError as e:
@@ -340,6 +579,10 @@ def search_kitab(
         return []
     finally:
         conn.close()
+
+
+# Alias backward compatibility — retrieval.py dan kode lain bisa pakai keduanya
+search_kitab_corpus = search_kitab
 
 
 def search_by_authority(

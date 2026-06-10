@@ -973,6 +973,82 @@
       display: inline-block;
     }
 
+    /* ── Kitab Citations (Phase B3) ───────────────────────────────── */
+    .kitab-group-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 12px 0 6px;
+      border-top: 1px solid var(--border-light);
+      margin-top: 8px;
+    }
+
+    .kitab-citation-card {
+      background: var(--cream-100);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      border-left-width: 3px;
+    }
+
+    .kitab-citation-card.authority-1 { border-left-color: #c9a84c; }
+    .kitab-citation-card.authority-2 { border-left-color: #6b9e78; }
+    .kitab-citation-card.authority-3 { border-left-color: #5b8fc9; }
+    .kitab-citation-card.authority-4 { border-left-color: #9b7ec8; }
+    .kitab-citation-card.authority-5 { border-left-color: #a0a0a0; }
+
+    .kc-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .kc-book-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    .kc-authority-badge {
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 99px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .authority-1 .kc-authority-badge { background: #fef3c7; color: #92400e; }
+    .authority-2 .kc-authority-badge { background: #d1fae5; color: #065f46; }
+    .authority-3 .kc-authority-badge { background: #dbeafe; color: #1e40af; }
+    .authority-4 .kc-authority-badge { background: #ede9fe; color: #5b21b6; }
+    .authority-5 .kc-authority-badge { background: #f3f4f6; color: #374151; }
+
+    .kc-chapter {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .kc-arabic {
+      font-family: 'Amiri', 'Scheherazade New', serif;
+      font-size: 14px;
+      line-height: 1.8;
+      direction: rtl;
+      text-align: right;
+      color: var(--text-primary);
+      background: var(--cream-200);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+    }
+
     /* Panel footer */
     .panel-footer {
       padding: 14px 22px;
@@ -1742,7 +1818,11 @@ function buildAssistantRow(msg, idx) {
   const row = document.createElement('div');
   row.className = 'msg-row assistant';
 
-  const hasDalil = msg.data && ((msg.data.quran && msg.data.quran.length) || (msg.data.hadis && msg.data.hadis.length));
+  const hasDalil = msg.data && (
+    (msg.data.quran && msg.data.quran.length) ||
+    (msg.data.hadis && msg.data.hadis.length) ||
+    (msg.data.kitab_citations && msg.data.kitab_citations.length)
+  );
   const isRejected = msg.data && !msg.data.found;
 
   let badgeHtml  = '';
@@ -1820,7 +1900,7 @@ function showDalilPanel(msgIdx) {
   const msg = sess.messages[msgIdx];
   if (!msg || !msg.data) return;
 
-  const { quran = [], hadis = [], ruling, madhab, reasoning } = msg.data;
+  const { quran = [], hadis = [], ruling, madhab, reasoning, kitab_citations = [] } = msg.data;
   const panelContent = document.getElementById('panel-content');
   const panelFooter  = document.getElementById('panel-footer');
   const panel        = document.getElementById('dalil-panel');
@@ -1890,6 +1970,29 @@ function showDalilPanel(msgIdx) {
 
   if (!html) {
     html = `<div class="panel-empty"><div class="icon">📭</div><p>Tidak ada dalil tersedia untuk jawaban ini.</p></div>`;
+  }
+
+  // Kitab Citations (Phase B3) — tampilkan di bawah Quran/Hadis
+  if (kitab_citations.length > 0) {
+    const _authorityLabel = { 1: 'Qawl Imam', 2: 'Qawl Ashhab', 3: "Mu'tamad",
+                               4: 'Syarh Mu\'tamad', 5: 'Tafsir/Qawa\'id' };
+    html += `<div class="kitab-group-label">📚 Kitab Klasik Syafi'i (${kitab_citations.length} referensi)</div>`;
+    kitab_citations.forEach(c => {
+      const lvl      = c.authority_level || 5;
+      const authLbl  = _authorityLabel[lvl] || `Level ${lvl}`;
+      const chapter  = c.chapter_title ? `<div class="kc-chapter">${escHtml(c.chapter_title)}</div>` : '';
+      const excerpt  = c.arabic_excerpt
+        ? `<div class="kc-arabic">${escHtml(c.arabic_excerpt)}</div>` : '';
+      html += `
+        <div class="kitab-citation-card authority-${lvl}">
+          <div class="kc-header">
+            <div class="kc-book-name">${escHtml(c.book_name || c.book_slug || '')}</div>
+            <span class="kc-authority-badge">${escHtml(authLbl)}</span>
+          </div>
+          ${chapter}
+          ${excerpt}
+        </div>`;
+    });
   }
 
   panelContent.innerHTML = html;
@@ -2044,6 +2147,8 @@ async function sendQuestion(question) {
         confidence_score: data.confidence_score || 0,
         disclaimer:       data.disclaimer || '',
         warnings:         data.warnings || [],
+        source:           data.source || '',
+        kitab_citations:  data.kitab_citations || [],
       },
     };
 
