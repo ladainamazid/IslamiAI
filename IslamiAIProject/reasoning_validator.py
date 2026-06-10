@@ -167,6 +167,13 @@ def compute_confidence(retrieval_result: dict) -> EvidenceReport:
     if rule_confidence == "high":
         score += 0.05
 
+    # Layer 1 override: rule yang dikurasi manual dengan confidence "high"
+    # dipercaya sebagai minimum medium meskipun dalil eksplisit terbatas.
+    # Jawab dengan disclaimer — jangan tolak sepenuhnya.
+    source = retrieval_result.get("_source", "")
+    if source == "static_rules" and rule_confidence == "high":
+        score = max(score, 0.55)
+
     # Cap di 1.0
     score = min(score, 1.0)
     score = round(score, 2)
