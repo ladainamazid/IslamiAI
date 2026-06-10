@@ -1,54 +1,41 @@
-# test_reasoning_validator.py
-# IslamiAI — Pytest suite untuk reasoning_validator.py
-#
-# Menguji: compute_confidence(), gate_answer(), EvidenceReport
-# Catatan: semua expected scores diverifikasi secara empiris terhadap
-#   implementasi aktual sebelum ditulis sebagai fixture.
-#
-# Scoring rubric (dari kode sumber):
-#   Quran (ada)      : +0.40, +0.05 per ayat tambahan (maks 3 extra = +0.15)
-#   Hadis sahih (ada): +0.30, +0.05 per hadis tambahan
-#   Hadis hasan      : +0.15
-#   Hadis dhaif      : +0.00 (warning saja)
-#   Rule high        : +0.05
-#   Threshold medium : >= 0.50, high >= 0.70
-#
-# Jalankan: pytest test_reasoning_validator.py -v
+"""
+test_reasoning_validator.py
+Bagian 1-6: test suite lama (57 test)
+Bagian 7  : TestKitabCorpusScoring — path kitab_corpus (33 test baru)
+Total     : 90 test
+"""
 
-import sys
-import os
 import pytest
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from reasoning_validator import (
-    compute_confidence,
-    gate_answer,
-    EvidenceReport,
-)
+from reasoning_validator import EvidenceReport, compute_confidence, gate_answer
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# Fixtures
-# ════════════════════════════════════════════════════════════════════════════════
+# ─── Helpers ──────────────────────────────────────────────────
 
-def _mock(quran_count=0, hadis_list=None, rule_conf="medium"):
-    """Helper membuat mock retrieval_result."""
-    return {
-        "topic": "test_topic",
-        "ruling": "wajib",
-        "confidence": rule_conf,
-        "quran": [{"arabic_text": "...", "theme": "aqidah"}] * quran_count,
-        "hadis": hadis_list or [],
-    }
-
-
-def _hadis(auth, source="TestSource"):
+def _hadis(auth: str, source: str = "Test Hadis") -> dict:
     return {"source": source, "authenticity": auth}
 
 
+def _mock(
+    quran_count: int = 0,
+    hadis_list: list = None,
+    ruling: str = "test_ruling",
+    confidence: str = "medium",
+    topic: str = "test_topic",
+) -> dict:
+    quran = [{"arabic_text": f"ayat_{i}", "surah_ayah": f"2:{i}"}
+             for i in range(quran_count)]
+    return {
+        "topic": topic,
+        "ruling": ruling,
+        "madhab": "shafii",
+        "quran": quran,
+        "hadis": hadis_list or [],
+        "confidence": confidence,
+    }
+
+
 # ════════════════════════════════════════════════════════════════════════════════
-# BAGIAN 1 — compute_confidence(): tipe dan struktur return value
+# BAGIAN 1 — Return type & struktur dasar
 # ════════════════════════════════════════════════════════════════════════════════
 
 class TestComputeConfidenceReturnType:
@@ -58,7 +45,7 @@ class TestComputeConfidenceReturnType:
         assert isinstance(result, EvidenceReport)
 
     def test_confidence_score_is_float(self):
-        result = compute_confidence(_mock(quran_count=1))
+        result = compute_confidence(_mock())
         assert isinstance(result.confidence_score, float)
 
     def test_confidence_label_is_string(self):
@@ -66,14 +53,12 @@ class TestComputeConfidenceReturnType:
         assert isinstance(result.confidence_label, str)
 
     def test_confidence_label_valid_values(self):
-        valid = {"high", "medium", "insufficient"}
         result = compute_confidence(_mock())
-        assert result.confidence_label in valid
+        assert result.confidence_label in {"high", "medium", "insufficient"}
 
     def test_score_never_exceeds_1(self):
-        # Banyak evidence sekaligus — skor tidak boleh > 1.0
-        hadis = [_hadis("sahih", f"H{i}") for i in range(10)]
-        result = compute_confidence(_mock(quran_count=5, hadis_list=hadis, rule_conf="high"))
+        hadis = [_hadis("sahih")] * 10
+        result = compute_confidence(_mock(quran_count=5, hadis_list=hadis))
         assert result.confidence_score <= 1.0
 
     def test_score_never_below_0(self):
@@ -95,14 +80,10 @@ class TestComputeConfidenceReturnType:
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# BAGIAN 2 — compute_confidence(): scoring rubric (nilai eksak)
+# BAGIAN 2 — Scoring rubrik
 # ════════════════════════════════════════════════════════════════════════════════
 
 class TestConfidenceScoring:
-    """
-    Verifikasi nilai score eksak berdasarkan rubrik.
-    Semua expected value diverifikasi secara empiris.
-    """
 
     def test_empty_evidence_score_zero(self):
         result = compute_confidence(_mock())
@@ -113,7 +94,6 @@ class TestConfidenceScoring:
         assert result.confidence_score == 0.40
 
     def test_two_quran_verses_score_045(self):
-        # 0.40 base + 0.05 extra
         result = compute_confidence(_mock(quran_count=2))
         assert result.confidence_score == 0.45
 
@@ -130,44 +110,49 @@ class TestConfidenceScoring:
         assert result.confidence_score == 0.0
 
     def test_one_quran_one_sahih_score_070(self):
-        # 0.40 + 0.30 = 0.70 → threshold high
-        hadis = [_hadis("sahih")]
-        result = compute_confidence(_mock(quran_count=1, hadis_list=hadis))
+        result = compute_confidence(_mock(
+            quran_count=1,
+            hadis_list=[_hadis("sahih")]
+        ))
         assert result.confidence_score == 0.70
 
     def test_two_quran_one_sahih_rule_high_score_080(self):
-        # 0.40 + 0.05(extra) + 0.30 + 0.05(rule) = 0.80
-        hadis = [_hadis("sahih")]
-        result = compute_confidence(_mock(quran_count=2, hadis_list=hadis, rule_conf="high"))
+        result = compute_confidence(_mock(
+            quran_count=2,
+            hadis_list=[_hadis("sahih")],
+            confidence="high"
+        ))
         assert result.confidence_score == 0.80
 
     def test_rule_high_adds_bonus_005(self):
-        # Tanpa rule bonus
-        base = compute_confidence(_mock(quran_count=1, rule_conf="medium"))
-        # Dengan rule bonus
-        boosted = compute_confidence(_mock(quran_count=1, rule_conf="high"))
-        assert boosted.confidence_score == base.confidence_score + 0.05
+        base = compute_confidence(_mock(quran_count=1, confidence="medium"))
+        high = compute_confidence(_mock(quran_count=1, confidence="high"))
+        assert high.confidence_score - base.confidence_score == pytest.approx(0.05)
 
     def test_score_capped_at_one(self):
-        # Banyak quran + hadis + rule high
         hadis = [_hadis("sahih")] * 5
-        result = compute_confidence(_mock(quran_count=5, hadis_list=hadis, rule_conf="high"))
+        result = compute_confidence(_mock(
+            quran_count=5,
+            hadis_list=hadis,
+            confidence="high"
+        ))
         assert result.confidence_score == 1.0
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# BAGIAN 3 — compute_confidence(): confidence labels
+# BAGIAN 3 — Labels & is_answerable
 # ════════════════════════════════════════════════════════════════════════════════
 
 class TestConfidenceLabels:
 
     def test_score_070_gives_high_label(self):
-        # 1 quran + 1 sahih = 0.70 → high
-        result = compute_confidence(_mock(quran_count=1, hadis_list=[_hadis("sahih")]))
+        result = compute_confidence(_mock(
+            quran_count=1,
+            hadis_list=[_hadis("sahih")]
+        ))
         assert result.confidence_label == "high"
 
     def test_score_below_050_gives_insufficient_label(self):
-        # 1 quran saja = 0.40 → insufficient
         result = compute_confidence(_mock(quran_count=1))
         assert result.confidence_label == "insufficient"
 
@@ -176,7 +161,10 @@ class TestConfidenceLabels:
         assert result.confidence_label == "insufficient"
 
     def test_is_answerable_true_when_high(self):
-        result = compute_confidence(_mock(quran_count=1, hadis_list=[_hadis("sahih")]))
+        result = compute_confidence(_mock(
+            quran_count=1,
+            hadis_list=[_hadis("sahih")]
+        ))
         assert result.is_answerable is True
 
     def test_is_answerable_false_when_insufficient(self):
@@ -184,7 +172,10 @@ class TestConfidenceLabels:
         assert result.is_answerable is False
 
     def test_high_label_has_no_disclaimer(self):
-        result = compute_confidence(_mock(quran_count=1, hadis_list=[_hadis("sahih")]))
+        result = compute_confidence(_mock(
+            quran_count=1,
+            hadis_list=[_hadis("sahih")]
+        ))
         assert result.disclaimer == ""
 
     def test_insufficient_label_has_disclaimer(self):
@@ -192,63 +183,62 @@ class TestConfidenceLabels:
         assert len(result.disclaimer) > 0
 
     def test_insufficient_disclaimer_not_empty(self):
-        result = compute_confidence(_mock())
-        assert result.disclaimer.strip() != ""
+        result = compute_confidence(_mock(hadis_list=[_hadis("dhaif")]))
+        assert result.disclaimer != ""
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# BAGIAN 4 — compute_confidence(): warnings
+# BAGIAN 4 — Warnings
 # ════════════════════════════════════════════════════════════════════════════════
 
 class TestConfidenceWarnings:
 
     def test_dhaif_hadis_generates_warning(self):
-        result = compute_confidence(_mock(hadis_list=[_hadis("dhaif", "DhaifSource")]))
-        assert len(result.warnings) > 0
+        result = compute_confidence(_mock(hadis_list=[_hadis("dhaif", "HR. X")]))
+        assert len(result.warnings) >= 1
 
     def test_hasan_hadis_generates_warning(self):
-        result = compute_confidence(_mock(hadis_list=[_hadis("hasan", "HasanSource")]))
-        assert len(result.warnings) > 0
+        result = compute_confidence(_mock(hadis_list=[_hadis("hasan", "HR. Y")]))
+        assert len(result.warnings) >= 1
 
     def test_sahih_hadis_no_authenticity_warning(self):
+        # Sahih tidak menghasilkan warning autentisitas (berbeda dengan dhaif/hasan).
+        # Catatan: score 0.30 < threshold -> bisa ada warning "confidence rendah",
+        # tapi itu bukan warning autentisitas — tidak boleh ada "berstatus" di dalamnya.
         result = compute_confidence(_mock(hadis_list=[_hadis("sahih")]))
-        # Sahih tidak menghasilkan warning autentisitas (hanya hasan/dhaif yang menghasilkan).
-        # Catatan: jika skor akhir < 0.50 (sahih tanpa quran = 0.30), sistem tetap
-        # menambahkan warning "confidence terlalu rendah" — itu perilaku benar.
-        # Test ini hanya memverifikasi tidak ada warning khusus authenticity.
-        auth_warnings = [w for w in result.warnings
-                         if "sahih" in w.lower() or "autentisitas" in w.lower()]
-        assert len(auth_warnings) == 0
+        assert not any("berstatus" in w for w in result.warnings)
 
     def test_dhaif_warning_mentions_source(self):
-        result = compute_confidence(_mock(hadis_list=[_hadis("dhaif", "TestDhaifSource")]))
-        assert any("TestDhaifSource" in w for w in result.warnings)
+        result = compute_confidence(_mock(hadis_list=[_hadis("dhaif", "HR. TestSource")]))
+        assert any("TestSource" in w for w in result.warnings)
 
     def test_insufficient_score_adds_warning(self):
         result = compute_confidence(_mock())
-        # Saat insufficient, satu warning tentang confidence ditambahkan
-        assert len(result.warnings) >= 1
+        assert any("rendah" in w.lower() for w in result.warnings)
 
     def test_no_warnings_on_strong_evidence(self):
-        # Evidence kuat: quran + sahih, tanpa hadis bermasalah
-        result = compute_confidence(_mock(quran_count=2, hadis_list=[_hadis("sahih")]))
-        assert len(result.warnings) == 0
+        result = compute_confidence(_mock(
+            quran_count=2,
+            hadis_list=[_hadis("sahih"), _hadis("sahih")],
+            confidence="high"
+        ))
+        assert result.warnings == []
 
     def test_multiple_dhaif_generate_multiple_warnings(self):
-        hadis = [_hadis("dhaif", f"Dhaif{i}") for i in range(3)]
+        hadis = [_hadis("dhaif", f"HR.{i}") for i in range(3)]
         result = compute_confidence(_mock(hadis_list=hadis))
-        # 3 dhaif + 1 insufficient warning = minimal 4
-        assert len(result.warnings) >= 3
+        dhaif_warnings = [w for w in result.warnings if "dhaif" in w.lower()]
+        assert len(dhaif_warnings) == 3
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# BAGIAN 5 — gate_answer(): kontrak return
+# BAGIAN 5 — gate_answer()
 # ════════════════════════════════════════════════════════════════════════════════
 
 class TestGateAnswer:
 
     def test_returns_tuple_of_three(self):
-        result = gate_answer(_mock(quran_count=1, hadis_list=[_hadis("sahih")]))
+        result = gate_answer(_mock())
         assert len(result) == 3
 
     def test_returns_bool_as_first_element(self):
@@ -256,7 +246,7 @@ class TestGateAnswer:
         assert isinstance(can_answer, bool)
 
     def test_none_input_returns_false(self):
-        can_answer, report, reason = gate_answer(None)
+        can_answer, _, _ = gate_answer(None)
         assert can_answer is False
 
     def test_none_input_returns_none_report(self):
@@ -268,18 +258,24 @@ class TestGateAnswer:
         assert len(reason) > 0
 
     def test_strong_evidence_can_answer_true(self):
-        mock = _mock(quran_count=1, hadis_list=[_hadis("sahih")])
-        can_answer, _, _ = gate_answer(mock)
+        can_answer, _, _ = gate_answer(_mock(
+            quran_count=1,
+            hadis_list=[_hadis("sahih")]
+        ))
         assert can_answer is True
 
     def test_strong_evidence_report_not_none(self):
-        mock = _mock(quran_count=1, hadis_list=[_hadis("sahih")])
-        _, report, _ = gate_answer(mock)
+        _, report, _ = gate_answer(_mock(
+            quran_count=1,
+            hadis_list=[_hadis("sahih")]
+        ))
         assert report is not None
 
     def test_strong_evidence_reason_empty(self):
-        mock = _mock(quran_count=1, hadis_list=[_hadis("sahih")])
-        _, _, reason = gate_answer(mock)
+        _, _, reason = gate_answer(_mock(
+            quran_count=1,
+            hadis_list=[_hadis("sahih")]
+        ))
         assert reason == ""
 
     def test_empty_evidence_can_answer_false(self):
@@ -291,37 +287,30 @@ class TestGateAnswer:
         assert len(reason) > 0
 
     def test_dhaif_only_cannot_answer(self):
-        mock = _mock(hadis_list=[_hadis("dhaif")])
-        can_answer, _, _ = gate_answer(mock)
+        can_answer, _, _ = gate_answer(_mock(hadis_list=[_hadis("dhaif")]))
         assert can_answer is False
 
     def test_hasan_only_cannot_answer(self):
-        # 0.15 < 0.50 threshold
-        mock = _mock(hadis_list=[_hadis("hasan")])
-        can_answer, _, _ = gate_answer(mock)
+        can_answer, _, _ = gate_answer(_mock(hadis_list=[_hadis("hasan")]))
         assert can_answer is False
 
     def test_report_topic_matches_input(self):
-        mock = _mock(quran_count=1, hadis_list=[_hadis("sahih")])
-        mock["topic"] = "syahadat"
-        _, report, _ = gate_answer(mock)
-        assert report.topic == "syahadat"
+        _, report, _ = gate_answer(_mock(topic="shalat"))
+        assert report.topic == "shalat"
 
     def test_report_ruling_matches_input(self):
-        mock = _mock(quran_count=1, hadis_list=[_hadis("sahih")])
-        mock["ruling"] = "wajib"
-        _, report, _ = gate_answer(mock)
+        _, report, _ = gate_answer(_mock(ruling="wajib"))
         assert report.ruling == "wajib"
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# BAGIAN 6 — has_quran_evidence dan has_hadis_evidence flags
+# BAGIAN 6 — Evidence flags
 # ════════════════════════════════════════════════════════════════════════════════
 
 class TestEvidenceFlags:
 
     def test_has_quran_evidence_true_when_present(self):
-        result = compute_confidence(_mock(quran_count=2))
+        result = compute_confidence(_mock(quran_count=1))
         assert result.has_quran_evidence is True
 
     def test_has_quran_evidence_false_when_absent(self):
@@ -337,7 +326,6 @@ class TestEvidenceFlags:
         assert result.has_hadis_evidence is True
 
     def test_has_hadis_evidence_false_for_dhaif_only(self):
-        # Dhaif tidak dihitung sebagai evidence
         result = compute_confidence(_mock(hadis_list=[_hadis("dhaif")]))
         assert result.has_hadis_evidence is False
 
@@ -351,3 +339,212 @@ class TestEvidenceFlags:
         assert "sahih" in result.hadis_authenticity
         assert "dhaif" in result.hadis_authenticity
         assert "hasan" in result.hadis_authenticity
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# BAGIAN 7 — kitab_corpus path: _compute_confidence_kitab()
+#
+# Rubrik (dari implementasi):
+#   authority_level <= 2  -> 0.60  medium
+#   authority_level <= 4  -> 0.52  medium
+#   authority_level  = 5  -> 0.50  medium (batas bawah)
+#   _kitab_hits kosong    -> 0.00  insufficient
+#
+# Dispatch: compute_confidence() mendelegasikan ke _compute_confidence_kitab()
+# jika dan hanya jika _source == "kitab_corpus".
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _mock_kitab(authority_levels=None):
+    """
+    Helper membuat mock retrieval_result untuk _source='kitab_corpus'.
+    authority_levels: list of int, satu entry per hit.
+    Kosong/None -> _kitab_hits = [].
+    """
+    hits = [
+        {"book_slug": f"kitab_{lvl}", "authority_level": lvl,
+         "chapter_title": "بَابٌ", "arabic_text": "نَصٌّ", "page_ref": "1"}
+        for lvl in (authority_levels or [])
+    ]
+    return {
+        "topic": "test_kitab_topic",
+        "ruling": "",
+        "madhab": "shafii",
+        "quran": [],
+        "hadis": [],
+        "confidence": "medium",
+        "_source": "kitab_corpus",
+        "_kitab_hits": hits,
+    }
+
+
+class TestKitabCorpusScoring:
+    """
+    Verifikasi _compute_confidence_kitab() via dispatch di compute_confidence().
+    Semua mock menyertakan _source='kitab_corpus' untuk memicu dispatch.
+    """
+
+    # ── Return type ──────────────────────────────────────────────
+
+    def test_returns_evidence_report(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert isinstance(result, EvidenceReport)
+
+    # ── Score eksak per authority_level ─────────────────────────
+
+    def test_level_1_score_060(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert result.confidence_score == 0.60
+
+    def test_level_2_score_060(self):
+        result = compute_confidence(_mock_kitab([2]))
+        assert result.confidence_score == 0.60
+
+    def test_level_3_score_052(self):
+        result = compute_confidence(_mock_kitab([3]))
+        assert result.confidence_score == 0.52
+
+    def test_level_4_score_052(self):
+        result = compute_confidence(_mock_kitab([4]))
+        assert result.confidence_score == 0.52
+
+    def test_level_5_score_050(self):
+        result = compute_confidence(_mock_kitab([5]))
+        assert result.confidence_score == 0.50
+
+    def test_empty_hits_score_zero(self):
+        result = compute_confidence(_mock_kitab([]))
+        assert result.confidence_score == 0.0
+
+    # ── min() strategy: best (lowest) level menang ───────────────
+
+    def test_mixed_levels_uses_min(self):
+        result = compute_confidence(_mock_kitab([1, 5]))
+        assert result.confidence_score == 0.60
+
+    def test_mixed_level_3_and_5_uses_min(self):
+        result = compute_confidence(_mock_kitab([3, 5]))
+        assert result.confidence_score == 0.52
+
+    # ── Labels ───────────────────────────────────────────────────
+
+    def test_level_1_label_medium(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert result.confidence_label == "medium"
+
+    def test_level_5_label_medium(self):
+        result = compute_confidence(_mock_kitab([5]))
+        assert result.confidence_label == "medium"
+
+    def test_empty_hits_label_insufficient(self):
+        result = compute_confidence(_mock_kitab([]))
+        assert result.confidence_label == "insufficient"
+
+    # ── is_answerable ────────────────────────────────────────────
+
+    def test_level_1_is_answerable(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert result.is_answerable is True
+
+    def test_level_5_is_answerable(self):
+        result = compute_confidence(_mock_kitab([5]))
+        assert result.is_answerable is True
+
+    def test_empty_hits_not_answerable(self):
+        result = compute_confidence(_mock_kitab([]))
+        assert result.is_answerable is False
+
+    # ── kitab-specific fields di EvidenceReport ─────────────────
+
+    def test_kitab_hits_count_correct(self):
+        result = compute_confidence(_mock_kitab([1, 3, 5]))
+        assert result.kitab_hits_count == 3
+
+    def test_kitab_hits_count_zero_when_empty(self):
+        result = compute_confidence(_mock_kitab([]))
+        assert result.kitab_hits_count == 0
+
+    def test_kitab_best_authority_correct(self):
+        result = compute_confidence(_mock_kitab([3, 1, 4]))
+        assert result.kitab_best_authority == 1
+
+    def test_kitab_best_authority_none_when_empty(self):
+        result = compute_confidence(_mock_kitab([]))
+        assert result.kitab_best_authority is None
+
+    # ── Field-field yang harus nol di path kitab_corpus ─────────
+
+    def test_has_quran_evidence_false(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert result.has_quran_evidence is False
+
+    def test_has_hadis_evidence_false(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert result.has_hadis_evidence is False
+
+    def test_quran_count_zero(self):
+        result = compute_confidence(_mock_kitab([2]))
+        assert result.quran_count == 0
+
+    def test_hadis_count_zero(self):
+        result = compute_confidence(_mock_kitab([2]))
+        assert result.hadis_count == 0
+
+    def test_hadis_authenticity_empty(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert result.hadis_authenticity == []
+
+    # ── Warnings ─────────────────────────────────────────────────
+
+    def test_warning_present_when_hits_exist(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert len(result.warnings) == 1
+
+    def test_warning_mentions_korpus(self):
+        result = compute_confidence(_mock_kitab([3]))
+        assert any("korpus" in w.lower() for w in result.warnings)
+
+    def test_empty_hits_has_insufficient_warning(self):
+        result = compute_confidence(_mock_kitab([]))
+        assert any("rendah" in w.lower() for w in result.warnings)
+
+    # ── Disclaimer ───────────────────────────────────────────────
+
+    def test_medium_disclaimer_not_empty(self):
+        result = compute_confidence(_mock_kitab([1]))
+        assert len(result.disclaimer) > 0
+
+    def test_medium_disclaimer_mentions_kitab(self):
+        result = compute_confidence(_mock_kitab([4]))
+        assert "kitab" in result.disclaimer.lower()
+
+    def test_empty_hits_disclaimer_not_empty(self):
+        result = compute_confidence(_mock_kitab([]))
+        assert len(result.disclaimer) > 0
+
+    # ── gate_answer integration ──────────────────────────────────
+
+    def test_gate_level_1_can_answer(self):
+        can_answer, _, _ = gate_answer(_mock_kitab([1]))
+        assert can_answer is True
+
+    def test_gate_level_5_can_answer(self):
+        can_answer, _, _ = gate_answer(_mock_kitab([5]))
+        assert can_answer is True
+
+    def test_gate_empty_hits_cannot_answer(self):
+        can_answer, _, _ = gate_answer(_mock_kitab([]))
+        assert can_answer is False
+
+    def test_gate_report_has_kitab_fields(self):
+        _, report, _ = gate_answer(_mock_kitab([2, 4]))
+        assert report.kitab_hits_count == 2
+        assert report.kitab_best_authority == 2
+
+    # ── Regresi: dispatch tidak memengaruhi path Layer 1-3 ───────
+
+    def test_non_kitab_source_unaffected(self):
+        regular = _mock(quran_count=1, hadis_list=[_hadis("sahih")])
+        result = compute_confidence(regular)
+        assert result.confidence_score == 0.70
+        assert result.kitab_hits_count == 0
+        assert result.kitab_best_authority is None

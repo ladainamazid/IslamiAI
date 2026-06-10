@@ -20,7 +20,7 @@ class EvidenceReport:
     topic: str
     ruling: str
     confidence_score: float          # 0.0 – 1.0
-    confidence_label: str            # "high" | "medium" | "low" | "insufficient"
+    confidence_label: str            # "high" | "medium" | "insufficient"
     has_quran_evidence: bool
     has_hadis_evidence: bool
     quran_count: int
@@ -29,13 +29,90 @@ class EvidenceReport:
     warnings: list = field(default_factory=list)
     is_answerable: bool = True
     disclaimer: str = ""
+    # Layer 4 — kitab corpus fields (default untuk backward compatibility)
+    kitab_hits_count: int = 0
+    kitab_best_authority: Optional[int] = None  # level 1-5, None jika bukan kitab_corpus
+
+
+def _compute_confidence_kitab(retrieval_result: dict) -> EvidenceReport:
+    """
+    Scoring khusus untuk _source='kitab_corpus'.
+
+    Score ditentukan dari authority_level TERBAIK (minimum) di _kitab_hits,
+    karena satu nukilan sahih dari Al-Umm sudah cukup sebagai dasar hukum.
+
+    Rubrik authority_level:
+      <= 2  (Qawl Imam / Qawl Ashhab)       -> 0.60  medium
+      <= 4  (Mu'tamad / Syarh Mu'tamad)     -> 0.52  medium
+        5   (Tafsir Ahkam / Qawa'id)         -> 0.50  medium (batas bawah)
+      tidak ada hits                         -> 0.00  insufficient
+    """
+    kitab_hits = retrieval_result.get("_kitab_hits", [])
+    warnings = []
+
+    if not kitab_hits:
+        score = 0.0
+        best_level = None
+    else:
+        best_level = min(h.get("authority_level", 5) for h in kitab_hits)
+        if best_level <= 2:
+            score = 0.60
+        elif best_level <= 4:
+            score = 0.52
+        else:                        # level 5: Tafsir & Qawa'id
+            score = 0.50
+        warnings.append(
+            "Jawaban bersumber dari teks kitab korpus; "
+            "dalil Quran/hadis belum dipetakan secara eksplisit dalam database."
+        )
+
+    if score >= 0.70:
+        label = "high"
+        disclaimer = ""
+        is_answerable = True
+    elif score >= config.MIN_CONFIDENCE_SCORE:
+        label = "medium"
+        disclaimer = (
+            "⚠️  Catatan: Jawaban ini merujuk pada teks kitab klasik dalam korpus. "
+            "Untuk kepastian hukum, konsultasikan dengan ulama atau ustaz terpercaya."
+        )
+        is_answerable = True
+    else:
+        label = "insufficient"
+        disclaimer = (
+            "❌  Database tidak memiliki cukup dalil untuk menjawab pertanyaan ini dengan "
+            "keyakinan yang memadai. Mohon tanyakan langsung kepada ulama atau ustaz."
+        )
+        is_answerable = False
+        warnings.append("Confidence terlalu rendah untuk dijawab secara otomatis.")
+
+    return EvidenceReport(
+        topic=retrieval_result.get("topic", "unknown"),
+        ruling=retrieval_result.get("ruling", ""),
+        confidence_score=score,
+        confidence_label=label,
+        has_quran_evidence=False,
+        has_hadis_evidence=False,
+        quran_count=0,
+        hadis_count=0,
+        hadis_authenticity=[],
+        warnings=warnings,
+        is_answerable=is_answerable,
+        disclaimer=disclaimer,
+        kitab_hits_count=len(kitab_hits),
+        kitab_best_authority=best_level,
+    )
 
 
 def compute_confidence(retrieval_result: dict) -> EvidenceReport:
     """
     Hitung confidence score berdasarkan kualitas dan kuantitas evidence.
 
-    Scoring rubric:
+    Untuk _source='kitab_corpus', scoring didelegasikan ke
+    _compute_confidence_kitab() karena dalil tidak hadir sebagai
+    quran[]/hadis[] melainkan sebagai _kitab_hits[].
+
+    Scoring rubric (Layer 1-3):
     - Quran evidence     : +0.40 (ada) + 0.05 per ayat tambahan (max 0.55)
     - Hadis sahih        : +0.30 (ada) + 0.05 per hadis tambahan (max 0.40)
     - Hadis hasan        : +0.15 per hadis
@@ -43,11 +120,15 @@ def compute_confidence(retrieval_result: dict) -> EvidenceReport:
     - Rule confidence    : +0.05 jika rule sendiri ditandai "high"
 
     Threshold:
-    - >= 0.70 → high (aman dijawab)
-    - >= 0.50 → medium (dijawab dengan disclaimer)
-    - <  0.50 → insufficient (tolak, arahkan ke ulama)
+    - >= 0.70 -> high (aman dijawab)
+    - >= 0.50 -> medium (dijawab dengan disclaimer)
+    - <  0.50 -> insufficient (tolak, arahkan ke ulama)
     """
+    # ── Dispatch ke kitab_corpus scorer ───────────────────────
+    if retrieval_result.get("_source") == "kitab_corpus":
+        return _compute_confidence_kitab(retrieval_result)
 
+    # ── Scoring normal (Layer 1-3) ─────────────────────────────
     warnings = []
     score = 0.0
 
@@ -149,7 +230,6 @@ def gate_answer(retrieval_result: Optional[dict]) -> tuple[bool, EvidenceReport 
 
 
 if __name__ == "__main__":
-    # Simulasi test tanpa import data lengkap
     mock_result_strong = {
         "topic": "syahadat",
         "ruling": "wajib",
@@ -161,22 +241,24 @@ if __name__ == "__main__":
         ]
     }
 
-    mock_result_weak = {
-        "topic": "zakat_muallaf",
-        "ruling": "mungkin_asnaf",
+    mock_result_kitab = {
+        "topic": "wudhu",
+        "ruling": "",
         "confidence": "medium",
         "quran": [],
-        "hadis": [{"source": "Hadis X", "authenticity": "dhaif"}]
+        "hadis": [],
+        "_source": "kitab_corpus",
+        "_kitab_hits": [
+            {"book_slug": "al_umm", "authority_level": 1,
+             "chapter_title": "كِتَابُ الطَّهَارَةِ", "arabic_text": "نَصٌّ"},
+        ]
     }
 
-    mock_result_none = None
-
     print("=== Reasoning Validator Test ===\n")
-
     for label, result in [
         ("STRONG (syahadat)", mock_result_strong),
-        ("WEAK (zakat_muallaf dhaif)", mock_result_weak),
-        ("NONE", mock_result_none),
+        ("KITAB CORPUS (wudhu)", mock_result_kitab),
+        ("NONE", None),
     ]:
         can_answer, report, reason = gate_answer(result)
         print(f"Case: {label}")
@@ -184,7 +266,7 @@ if __name__ == "__main__":
         if report:
             print(f"  Score       : {report.confidence_score}")
             print(f"  Label       : {report.confidence_label}")
-            print(f"  Warnings    : {report.warnings}")
+            print(f"  KitabLevel  : {report.kitab_best_authority}")
         if reason:
             print(f"  Reason      : {reason[:80]}")
         print()

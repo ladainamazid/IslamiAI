@@ -1,16 +1,14 @@
 """
-retrieval.py — UPDATE MINIMAL untuk integrasi data_cache.json
+retrieval.py — 4-layer retrieval pipeline
 ─────────────────────────────────────────────────────────────────
-PERUBAHAN dari versi sebelumnya:
-  HANYA satu fungsi baru ditambahkan: _load_extended_data()
-  Fungsi retrieve_ruling() TIDAK berubah signature-nya.
-
-Strategi lookup (tiga lapis):
-  1. shafii_rules dari islamic_data.py  → paling dipercaya, prioritas utama
-  2. quran/hadis dari islamic_data.py   → static, verified
+Strategi lookup (empat lapis):
+  1. shafii_rules dari islamic_data.py  → static, prioritas tertinggi
+  2. keyword search di shafii_rules     → fallback jika topic key tidak match
   3. quran/hadis dari data_cache.json   → extended, medium confidence
+  4. kitab_corpus FTS5 (db_retrieval)   → 28 kitab Shamela, aktif jika DB ada
 
-Jika cache tidak ada atau gagal dimuat → fallback ke static saja.
+Layer 4 graceful degradation: jika islamiai.db atau db_retrieval tidak
+tersedia, pipeline tetap berfungsi dengan Layer 1-3.
 Tidak ada network call di sini — network hanya di data_fetcher.py.
 """
 
@@ -22,6 +20,19 @@ from typing import Optional
 from islamic_data import quran_verses, hadis_collection, shafii_rules
 
 logger = logging.getLogger("islamiai.retrieval")
+
+# ── Layer 4: db_retrieval (kitab corpus FTS5) — opsional ──────
+# Graceful degradation: jika islamiai.db belum ada atau db_retrieval
+# belum terinstall, Layer 4 dinonaktifkan tanpa merusak Layer 1-3.
+try:
+    from db_retrieval import search_kitab as _search_kitab
+    _DB_RETRIEVAL_AVAILABLE = True
+except (ImportError, Exception) as _import_err:
+    _search_kitab = None
+    _DB_RETRIEVAL_AVAILABLE = False
+    logger.warning(
+        "db_retrieval tidak tersedia — Layer 4 dinonaktifkan. (%s)", _import_err
+    )
 
 _CACHE_FILE = os.path.join(os.path.dirname(__file__), "data_cache.json")
 
@@ -66,21 +77,17 @@ def retrieve_ruling(topic: str, madhab: str = "shafii") -> Optional[dict]:
     # ── Layer 1: Shafi'i rules (static, prioritas tertinggi) ──
     rule = shafii_rules.get(topic_lower)
     if rule:
-        # Resolve referensi Quran dari static data
         quran_resolved = _resolve_quran_refs(
             rule.get("basis_quran", []),
             quran_verses
         )
-        # Resolve referensi hadis dari static data
         hadis_resolved = _resolve_hadis_refs(
             rule.get("basis_hadis", []),
             hadis_collection
         )
 
-        # Jika static tidak cukup, coba tambah dari cache
         if len(quran_resolved) < 2 or len(hadis_resolved) < 1:
             quran_ext, hadis_ext = _load_extended_data()
-            # Tambah dari cache hanya jika belum ada di static
             for ref in rule.get("basis_quran", []):
                 if ref not in quran_verses and ref in quran_ext:
                     quran_resolved.append(quran_ext[ref])
@@ -101,7 +108,6 @@ def retrieve_ruling(topic: str, madhab: str = "shafii") -> Optional[dict]:
         }
 
     # ── Layer 2: Keyword search di static data ─────────────────
-    # Beberapa pertanyaan tidak match topic key langsung
     rule_by_keyword = _search_by_keyword(topic_lower, shafii_rules)
     if rule_by_keyword:
         rule_key, rule = rule_by_keyword
@@ -130,21 +136,49 @@ def retrieve_ruling(topic: str, madhab: str = "shafii") -> Optional[dict]:
             "madhab": madhab,
             "quran": theme_match["quran"],
             "hadis": theme_match["hadis"],
-            "confidence": "medium",      # Cache belum terverifikasi manual
+            "confidence": "medium",
             "reasoning": "",
             "keywords": [],
             "_source": "cache_extended",
             "_needs_review": True,
         }
 
-    logger.info("Topik '%s' tidak ditemukan di static maupun cache.", topic_lower)
+    # ── Layer 4: Kitab Corpus FTS5 ─────────────────────────────
+    if _DB_RETRIEVAL_AVAILABLE:
+        try:
+            kitab_hits = _search_kitab(topic_lower)
+        except Exception as e:
+            logger.warning("Layer 4 search gagal untuk '%s': %s", topic_lower, e)
+            kitab_hits = []
+
+        if kitab_hits:
+            logger.info(
+                "Topik '%s' ditemukan di kitab_corpus (%d hits).",
+                topic_lower, len(kitab_hits)
+            )
+            return {
+                "topic": topic_lower,
+                "ruling": "",
+                "madhab": madhab,
+                "quran": [],
+                "hadis": [],
+                "confidence": "medium",
+                "reasoning": "",
+                "keywords": [],
+                "_source": "kitab_corpus",
+                "_kitab_hits": kitab_hits,
+            }
+
+    logger.info(
+        "Topik '%s' tidak ditemukan di static, cache, maupun kitab_corpus.",
+        topic_lower
+    )
     return None
 
 
 # ─── Helper functions ──────────────────────────────────────────
 
 def _resolve_quran_refs(refs: list, data: dict) -> list:
-    """Resolve list ref key → list dict ayat yang lengkap."""
     result = []
     for ref in refs:
         if ref in data:
@@ -153,7 +187,6 @@ def _resolve_quran_refs(refs: list, data: dict) -> list:
 
 
 def _resolve_hadis_refs(refs: list, data: dict) -> list:
-    """Resolve list ref key → list dict hadis yang lengkap."""
     result = []
     for ref in refs:
         if ref in data:
@@ -162,10 +195,6 @@ def _resolve_hadis_refs(refs: list, data: dict) -> list:
 
 
 def _search_by_keyword(topic: str, rules: dict) -> Optional[tuple]:
-    """
-    Cari rule yang keyword-nya mengandung topic string.
-    Return (rule_key, rule_dict) atau None.
-    """
     for rule_key, rule in rules.items():
         keywords = rule.get("keywords", [])
         if any(topic in kw or kw in topic for kw in keywords):
@@ -174,16 +203,12 @@ def _search_by_keyword(topic: str, rules: dict) -> Optional[tuple]:
 
 
 def _search_theme_in_cache(topic: str, quran_ext: dict, hadis_ext: dict) -> Optional[dict]:
-    """
-    Cari di cache berdasarkan theme yang cocok dengan topic.
-    Return dict dengan 'quran' dan 'hadis' atau None.
-    """
     matched_quran = [
         v for v in quran_ext.values()
         if v.get("theme", "").lower() == topic
         or topic in v.get("theme", "").lower()
     ]
-    matched_hadis = []   # Hadis di cache tidak punya theme, skip untuk sekarang
+    matched_hadis = []
 
     if matched_quran:
         return {"quran": matched_quran[:3], "hadis": matched_hadis}
