@@ -509,6 +509,46 @@
       transform: translateY(-1px);
     }
 
+    /* Feature highlight cards di empty state */
+    .empty-features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 20px 0 4px;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .ef-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--cream-100);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      text-align: left;
+      transition: box-shadow 0.15s;
+    }
+
+    .ef-card:hover { box-shadow: var(--shadow-sm); }
+
+    .ef-icon { font-size: 20px; flex-shrink: 0; }
+
+    .ef-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .ef-desc {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: 1px;
+    }
+
     /* Message rows */
     .msg-row {
       display: flex;
@@ -761,6 +801,7 @@
     .dalil-panel {
       display: flex;
       flex-direction: column;
+      height: 100%;
       background: #FFFFFF;
       overflow: hidden;
       transition: width 0.35s var(--ease-out), opacity 0.3s;
@@ -812,11 +853,16 @@
 
     .panel-content {
       flex: 1;
+      height: 0;
+      min-height: 0;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
       padding: 20px 22px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
     }
 
     .panel-content::-webkit-scrollbar { width: 4px; }
@@ -1371,12 +1417,15 @@
       .chat-header { padding: 12px 16px; }
       .input-area  { padding: 12px 16px 16px; }
       .messages    { padding: 16px; }
-    }      .sidebar.mob-open { left: 0; box-shadow: var(--shadow-lg); }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar.mob-open { left: 0; box-shadow: var(--shadow-lg); }
 
       .dalil-panel {
         display: flex !important; position: fixed !important;
         bottom: -100% !important; left: 0; right: 0;
-        width: 100% !important; height: 80vh; z-index: 50;
+        width: 100% !important; height: 85vh; z-index: 50;
         border-radius: 20px 20px 0 0;
         transition: bottom 0.35s var(--ease-out) !important;
       }
@@ -1384,17 +1433,19 @@
       .dalil-panel.collapsed { bottom: -100% !important; opacity: 1 !important; }
 
       .chat-area { border-right: none; }
-
       .chat-header { padding: 12px 16px; }
       .input-area  { padding: 12px 16px 16px; }
       .messages    { padding: 16px; }
-    }      .sidebar.mob-open { left: 0; box-shadow: var(--shadow-lg); }
+    }
+
+    @media (max-width: 480px) {
+      .sidebar.mob-open { left: 0; box-shadow: var(--shadow-lg); }
 
       .dalil-panel {
         display: flex !important; position: fixed !important;
         bottom: -100% !important; left: 0; right: 0;
-        width: 100% !important; height: 80vh; z-index: 50;
-        border-radius: 20px 20px 0 0;
+        width: 100% !important; height: 90vh; z-index: 50;
+        border-radius: 16px 16px 0 0;
         transition: bottom 0.35s var(--ease-out) !important;
       }
       .dalil-panel.mob-open { bottom: 0 !important; box-shadow: var(--shadow-lg); }
@@ -1415,11 +1466,144 @@
         -webkit-backdrop-filter: none;
         background: rgba(245, 239, 227, 0.97);
       }
-      .messages    { padding: 16px; }
+      .messages { padding: 12px; }
+    }
+    /* ═══════════════════════════════════════════════════════════════
+       WELCOME SCREEN (Opsi A — tampil sekali per browser)
+    ════════════════════════════════════════════════════════════════ */
+    #welcome-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(160deg, #1a3a1e 0%, #2d5a34 45%, #1e4a28 100%);
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    #welcome-screen.hidden {
+      opacity: 0; visibility: hidden; pointer-events: none;
+    }
+    .welcome-card {
+      max-width: 420px; width: 90%;
+      text-align: center;
+      padding: 48px 36px 40px;
+      animation: welcomeFadeUp 0.7s var(--ease-out) both;
+    }
+    @keyframes welcomeFadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .welcome-bismillah {
+      font-family: 'Amiri', 'Scheherazade New', serif;
+      font-size: 26px;
+      color: rgba(245,239,227,0.75);
+      margin-bottom: 28px;
+      line-height: 1.6;
+      direction: rtl;
+    }
+    .welcome-logo {
+      font-size: 52px; margin-bottom: 16px;
+    }
+    .welcome-title {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 700;
+      color: #f5efe3;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    .welcome-title span {
+      color: #a8d5a2;
+    }
+    .welcome-subtitle {
+      font-size: 14px;
+      color: rgba(245,239,227,0.65);
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+    .welcome-features {
+      display: flex; flex-direction: column; gap: 10px;
+      margin-bottom: 36px;
+      text-align: left;
+    }
+    .welcome-feature {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px;
+      color: rgba(245,239,227,0.80);
+      background: rgba(255,255,255,0.07);
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.10);
+    }
+    .welcome-feature .wf-icon { font-size: 18px; flex-shrink: 0; }
+    .btn-welcome-start {
+      width: 100%;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: var(--font-ui);
+      color: #1a3a1e;
+      background: linear-gradient(135deg, #a8d5a2, #7bbf74);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      animation: pulse-btn 2s ease-in-out infinite;
+    }
+    @keyframes pulse-btn {
+      0%, 100% { box-shadow: 0 4px 20px rgba(168,213,162,0.3); }
+      50%       { box-shadow: 0 4px 32px rgba(168,213,162,0.65); }
+    }
+    .btn-welcome-start:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+      animation: none;
+    }
+    .btn-welcome-start:active { transform: translateY(0); animation: none; }
+    .welcome-disclaimer {
+      margin-top: 16px;
+      font-size: 10.5px;
+      color: rgba(245,239,227,0.35);
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     WELCOME SCREEN
+════════════════════════════════════════════════════════════════ -->
+<div id="welcome-screen" onclick="startApp()">
+  <div class="welcome-card" onclick="event.stopPropagation()">
+    <div class="welcome-bismillah">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+    <div class="welcome-logo">📚</div>
+    <div class="welcome-title">Islami<span>AI</span></div>
+    <div class="welcome-subtitle">
+      Asisten ilmu fikih berbasis kitab klasik Syafi'i —<br>
+      Quran, Hadis Shahih, dan 28 kitab ulama terpercaya.
+    </div>
+    <div class="welcome-features">
+      <div class="welcome-feature">
+        <span class="wf-icon">🕌</span>
+        <span>Jawaban berdasarkan Mazhab Syafi'i dengan dalil lengkap</span>
+      </div>
+      <div class="welcome-feature">
+        <span class="wf-icon">📖</span>
+        <span>Referensi dari Al-Majmu', Tuhfat al-Muhtaj, Al-Umm, dan lainnya</span>
+      </div>
+      <div class="welcome-feature">
+        <span class="wf-icon">⚖️</span>
+        <span>Tingkat keyakinan jawaban ditampilkan secara transparan</span>
+      </div>
+    </div>
+    <button class="btn-welcome-start" onclick="startApp()">✦ Mulai Bertanya</button>
+    <div style="margin-top:14px;font-size:11px;color:rgba(245,239,227,0.35);letter-spacing:0.05em;">
+      KETUK UNTUK MEMULAI
+    </div>
+    <div class="welcome-disclaimer">
+      Jawaban bersifat referensi keilmuan, bukan fatwa resmi.<br>
+      Untuk persoalan penting, konsultasikan kepada ulama.
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════════════
      APP SHELL
@@ -1483,11 +1667,39 @@
         <div class="empty-bismillah">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</div>
         <div class="empty-title">Assalamu'alaikum</div>
         <div class="empty-desc">
-          Silakan tanyakan topik fikih, hukum Islam, tata cara ibadah, atau pertanyaan islami lainnya.
+          Tanyakan topik fikih, hukum ibadah, muamalah, atau pertanyaan islami lainnya — dijawab berdasarkan dalil sahih dan kitab klasik ulama Syafi'i.
         </div>
-        <div class="empty-tags" id="quick-tags">
-          <!-- Rendered by JS -->
+        <div class="empty-features">
+          <div class="ef-card">
+            <span class="ef-icon">📖</span>
+            <div>
+              <div class="ef-title">Al-Quran & Hadis</div>
+              <div class="ef-desc">Dalil dari Quran & Kutub Sittah</div>
+            </div>
+          </div>
+          <div class="ef-card">
+            <span class="ef-icon">📚</span>
+            <div>
+              <div class="ef-title">28 Kitab Klasik</div>
+              <div class="ef-desc">Al-Majmu', Tuhfat al-Muhtaj, Al-Umm, dll.</div>
+            </div>
+          </div>
+          <div class="ef-card">
+            <span class="ef-icon">⚖️</span>
+            <div>
+              <div class="ef-title">Mazhab Syafi'i</div>
+              <div class="ef-desc">Hierarki otoritas dari Qawl Imam hingga Syarh</div>
+            </div>
+          </div>
+          <div class="ef-card">
+            <span class="ef-icon">🎯</span>
+            <div>
+              <div class="ef-title">Skor Keyakinan</div>
+              <div class="ef-desc">Transparansi kekuatan dalil setiap jawaban</div>
+            </div>
+          </div>
         </div>
+        <div class="empty-tags" id="quick-tags"></div>
       </div>
     </div>
 
@@ -1504,7 +1716,7 @@
           </svg>
         </button>
       </div>
-      <div class="input-hint">Enter untuk kirim · Shift+Enter untuk baris baru · jawaban berdasarkan dalil sahih</div>
+      <div class="input-hint">Enter untuk kirim · Shift+Enter baris baru · Jawaban berbasis dalil Quran, Hadis Shahih & kitab klasik Syafi'i</div>
     </div>
   </main>
 
@@ -1512,8 +1724,8 @@
   <aside class="dalil-panel collapsed" id="dalil-panel">
     <div class="panel-header">
       <div class="panel-title-block">
-        <div class="panel-title">Panel Dalil</div>
-        <div class="panel-subtitle">Referensi Quran & Hadis</div>
+        <div class="panel-title">Referensi Dalil</div>
+        <div class="panel-subtitle">Quran · Hadis · 28 Kitab Klasik Syafi'i</div>
       </div>
       <button class="btn-close-panel" id="btn-close-panel" aria-label="Tutup panel">✕</button>
     </div>
@@ -1521,7 +1733,7 @@
     <div class="panel-content" id="panel-content">
       <div class="panel-empty">
         <div class="icon">📖</div>
-        <p>Pilih jawaban untuk melihat dalil Quran dan Hadis yang mendasarinya.</p>
+        <p>Klik <strong>Dalil</strong> pada jawaban untuk melihat referensi Quran, Hadis, dan Kitab Klasik yang mendasarinya.</p>
       </div>
     </div>
 
@@ -2191,6 +2403,28 @@ async function sendQuestion(question) {
   document.getElementById('btn-send').disabled = false;
   renderSidebarSessions();
 }
+
+/* ──────────────────────────────────────────────────────────────
+   WELCOME SCREEN
+────────────────────────────────────────────────────────────── */
+function startApp() {
+  const ws = document.getElementById('welcome-screen');
+  if (!ws) return;
+  ws.style.opacity = '0';
+  ws.style.pointerEvents = 'none';
+  setTimeout(function() { ws.style.display = 'none'; }, 500);
+  try { localStorage.setItem('islamiai_welcomed', '1'); } catch(e) {}
+}
+
+// Skip welcome jika sudah pernah klik "Mulai"
+(function() {
+  try {
+    if (localStorage.getItem('islamiai_welcomed') === '1') {
+      const ws = document.getElementById('welcome-screen');
+      if (ws) { ws.style.display = 'none'; }
+    }
+  } catch(e) {}
+})();
 
 /* ──────────────────────────────────────────────────────────────
    ESCAPE HTML

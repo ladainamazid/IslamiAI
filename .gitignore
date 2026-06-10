@@ -14,3 +14,4 @@ venv/
 .vscode/
 ssl/
 corpus/
+*.bak
